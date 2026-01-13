@@ -55,12 +55,12 @@ func Seed() error {
 
 	// 创建子菜单
 	subMenus := []model.Menu{
-		{Name: "用户管理", Path: "/system/user", Icon: "UserOutlined", Component: "system/user", Sort: 1, Status: 1},
-		{Name: "角色管理", Path: "/system/role", Icon: "TeamOutlined", Component: "system/role", Sort: 2, Status: 1},
-		{Name: "权限管理", Path: "/system/permission", Icon: "SafetyOutlined", Component: "system/permission", Sort: 3, Status: 1},
-		{Name: "菜单管理", Path: "/system/menu", Icon: "MenuOutlined", Component: "system/menu", Sort: 4, Status: 1},
-		{Name: "系统设置", Path: "/system/settings", Icon: "SettingOutlined", Component: "system/settings", Sort: 5, Status: 1},
-		{Name: "导航管理", Path: "/system/navigation", Icon: "AppstoreOutlined", Component: "system/navigation", Sort: 7, Status: 1},
+		{Name: "导航管理", Path: "/system/navigation", Icon: "AppstoreOutlined", Component: "system/navigation", Sort: 1, Status: 1},
+		{Name: "用户管理", Path: "/system/user", Icon: "UserOutlined", Component: "system/user", Sort: 2, Status: 1},
+		{Name: "角色管理", Path: "/system/role", Icon: "TeamOutlined", Component: "system/role", Sort: 3, Status: 1},
+		{Name: "权限管理", Path: "/system/permission", Icon: "SafetyOutlined", Component: "system/permission", Sort: 4, Status: 1},
+		{Name: "菜单管理", Path: "/system/menu", Icon: "MenuOutlined", Component: "system/menu", Sort: 5, Status: 1},
+		{Name: "系统设置", Path: "/system/settings", Icon: "SettingOutlined", Component: "system/settings", Sort: 6, Status: 1},
 	}
 
 	for i := range subMenus {
@@ -85,10 +85,10 @@ func Seed() error {
 
 	// 创建 SSO 子菜单
 	ssoSubMenus := []model.Menu{
-		{Name: "租户管理", Path: "/sso/tenants", Icon: "BankOutlined", Component: "sso/TenantManage", Sort: 1, Status: 1},
-		{Name: "用户管理", Path: "/sso/users", Icon: "UserOutlined", Component: "sso/UserManage", Sort: 2, Status: 1},
-		{Name: "用户组管理", Path: "/sso/groups", Icon: "TeamOutlined", Component: "sso/GroupManage", Sort: 3, Status: 1},
-		{Name: "应用管理", Path: "/sso/clients", Icon: "AppstoreOutlined", Component: "sso/ClientManage", Sort: 4, Status: 1},
+		{Name: "租户管理", Path: "/sso/tenants", Icon: "TeamOutlined", Component: "sso/TenantManage", Sort: 1, Status: 1},
+		{Name: "应用管理", Path: "/sso/clients", Icon: "AppstoreOutlined", Component: "sso/ClientManage", Sort: 2, Status: 1},
+		{Name: "用户管理", Path: "/sso/users", Icon: "UserOutlined", Component: "sso/UserManage", Sort: 3, Status: 1},
+		{Name: "用户组管理", Path: "/sso/groups", Icon: "TeamOutlined", Component: "sso/GroupManage", Sort: 4, Status: 1},
 	}
 
 	for i := range ssoSubMenus {

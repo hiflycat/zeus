@@ -3,8 +3,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Plus, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
-import { getMenuList, createMenu, updateMenu, deleteMenu, Menu, MenuListParams, MenuListResponse } from '@/api/menu'
-import { usePagination } from '@/hooks/usePagination'
+import { getMenuList, createMenu, updateMenu, deleteMenu, Menu } from '@/api/menu'
 import { iconMap, iconList } from '@/components/IconSelector'
 import {
   Button,
@@ -31,7 +30,6 @@ import {
   SelectValue,
   Switch,
   ScrollArea,
-  Pagination,
 } from '@/components/ui-tw'
 
 const MenuList = () => {
@@ -42,6 +40,9 @@ const MenuList = () => {
   const [deletingMenuId, setDeletingMenuId] = useState<number | null>(null)
   const deleteConfirmRef = useRef<HTMLDivElement>(null)
   const deleteButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const [menus, setMenus] = useState<Menu[]>([])
+  const [loading, setLoading] = useState(false)
+  const [searchKeyword, setSearchKeyword] = useState('')
 
   // 点击外部关闭确认卡片
   useEffect(() => {
@@ -74,36 +75,37 @@ const MenuList = () => {
     status: 1,
   })
 
-  const {
-    data: menus,
-    loading,
-    total,
-    page,
-    pageSize,
-    searchKeyword,
-    handlePageChange,
-    handleSearch,
-    handleSearchSubmit,
-    refresh,
-  } = usePagination<Menu>({
-    fetchFn: async (params) => {
-      const menusRes = await getMenuList(params as MenuListParams)
-      // 如果返回的是分页数据，直接返回
-      if (menusRes && typeof menusRes === 'object' && 'list' in menusRes) {
-        return menusRes as MenuListResponse
+  // 获取菜单列表
+  const fetchMenus = async () => {
+    setLoading(true)
+    try {
+      const res = await getMenuList()
+      // 扁平化树形结构
+      const flattenMenus = (menus: Menu[]): Menu[] => {
+        let result: Menu[] = []
+        for (const menu of menus) {
+          result.push(menu)
+          if (menu.children && menu.children.length > 0) {
+            result = result.concat(flattenMenus(menu.children))
+          }
+        }
+        return result
       }
-      // 如果返回的是树形结构数组，转换为分页格式（这种情况不应该发生，因为带了分页参数）
-      return {
-        list: Array.isArray(menusRes) ? menusRes : [],
-        total: Array.isArray(menusRes) ? menusRes.length : 0,
-        page: params.page || 1,
-        page_size: params.page_size || 10,
-      }
-    },
-    defaultPageSize: 10,
-  })
+      const allMenus = Array.isArray(res) ? flattenMenus(res) : []
+      setMenus(allMenus)
+      setTopMenus(allMenus.filter(m => !m.parent_id || m.parent_id === 0))
+    } catch {
+      // 错误已在拦截器处理
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  // 构建菜单树（仅用于显示，分页数据可能不完整）
+  useEffect(() => {
+    fetchMenus()
+  }, [])
+
+  // 构建菜单树
   const buildMenuTree = (menuList: Menu[], parentId: number = 0): any[] => {
     return menuList
       .filter(m => (m.parent_id || 0) === parentId)
@@ -146,39 +148,28 @@ const MenuList = () => {
     }
   }, [allFlatMenus, columnWidths])
 
-  // 过滤菜单（后端已搜索，这里只需要构建树形结构）
-  // 如果树形结构为空，则显示扁平列表
+  // 过滤菜单
   const filteredMenuTree = useMemo(() => {
-    // 如果树形结构有数据，使用树形结构
-    if (menuTree.length > 0) {
+    if (!searchKeyword.trim()) {
       return menuTree
     }
-    // 如果树形结构为空（可能是分页数据不完整，比如当前页只有子菜单没有父菜单），直接显示扁平列表
-    // 按 sort 排序
-    const sortedMenus = [...menus].sort((a, b) => (a.sort || 0) - (b.sort || 0))
-    return sortedMenus.map(menu => ({ ...menu, children: [] }))
-  }, [menuTree, menus])
-
-  // 获取所有顶级菜单（用于父菜单选择）
-  useEffect(() => {
-    getMenuList() // 不带分页参数，获取树形结构菜单
-      .then(res => {
-        // res 是树形结构数组，需要扁平化
-        const flattenMenus = (menus: Menu[]): Menu[] => {
-          let result: Menu[] = []
-          for (const menu of menus) {
-            result.push(menu)
-            if (menu.children && menu.children.length > 0) {
-              result = result.concat(flattenMenus(menu.children))
-            }
+    // 搜索时过滤
+    const keyword = searchKeyword.toLowerCase()
+    const filterTree = (tree: any[]): any[] => {
+      return tree
+        .map(menu => {
+          const children = filterTree(menu.children || [])
+          const match = menu.name.toLowerCase().includes(keyword) ||
+            (menu.path && menu.path.toLowerCase().includes(keyword))
+          if (match || children.length > 0) {
+            return { ...menu, children }
           }
-          return result
-        }
-        const allMenus = Array.isArray(res) ? flattenMenus(res) : []
-        setTopMenus(allMenus.filter(m => !m.parent_id || m.parent_id === 0))
-      })
-      .catch(() => {})
-  }, [])
+          return null
+        })
+        .filter(Boolean)
+    }
+    return filterTree(menuTree)
+  }, [menuTree, searchKeyword])
 
   const handleCreate = (parentId: number = 0) => {
     setEditingMenu(null)
@@ -217,9 +208,8 @@ const MenuList = () => {
       await deleteMenu(menu.id!)
       toast.success(t('menu.deleteSuccess'))
       setDeletingMenuId(null)
-      refresh()
-    } catch (error: any) {
-      // 错误提示已在响应拦截器中根据错误码显示
+      fetchMenus()
+    } catch {
       setDeletingMenuId(null)
     }
   }
@@ -242,8 +232,8 @@ const MenuList = () => {
         toast.success(t('menu.createSuccess'))
       }
       setDialogOpen(false)
-      refresh()
-    } catch (error: any) {
+      fetchMenus()
+    } catch {
       // 错误提示已在响应拦截器中根据错误码显示
     }
   }
@@ -252,8 +242,8 @@ const MenuList = () => {
     try {
       await updateMenu(menu.id!, { ...menu, status: checked ? 1 : 0 })
       toast.success(t('menu.statusUpdateSuccess'))
-      refresh()
-    } catch (error: any) {
+      fetchMenus()
+    } catch {
       // 错误提示已在响应拦截器中根据错误码显示
     }
   }
@@ -306,14 +296,14 @@ const MenuList = () => {
             <div className="relative">
               <TableActions>
                 <TableActionButton variant="edit" onClick={() => handleEdit(menu)} />
-                <TableActionButton 
-                  variant="delete" 
+                <TableActionButton
+                  variant="delete"
                   ref={(el) => {
                     if (el && menu.id) {
                       deleteButtonRefs.current.set(menu.id, el)
                     }
                   }}
-                  onClick={() => handleDeleteClick(menu)} 
+                  onClick={() => handleDeleteClick(menu)}
                 />
               </TableActions>
               <DeleteConfirmCard
@@ -340,12 +330,7 @@ const MenuList = () => {
           <Input
             placeholder={`${t('common.search')}...`}
             value={searchKeyword}
-            onChange={(e) => handleSearch(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleSearchSubmit()
-              }
-            }}
+            onChange={(e) => setSearchKeyword(e.target.value)}
             className="pl-10"
           />
         </div>
@@ -417,8 +402,6 @@ const MenuList = () => {
           <TableBody>
             {loading ? (
               <TableEmpty colSpan={7} loading />
-            ) : menus.length === 0 ? (
-              <TableEmpty colSpan={7} />
             ) : filteredMenuTree.length === 0 ? (
               <TableEmpty colSpan={7} />
             ) : (
@@ -426,12 +409,6 @@ const MenuList = () => {
             )}
           </TableBody>
         </Table>
-        <Pagination
-          current={page}
-          total={total}
-          pageSize={pageSize}
-          onChange={handlePageChange}
-        />
       </div>
 
       {/* Dialog */}
