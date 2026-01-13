@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus } from 'lucide-react'
+import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import {
   Button, Input, Card, CardContent, CardHeader, CardTitle,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableActions, TableActionButton,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
   Label, Switch,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -34,6 +36,7 @@ const GroupManage = () => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingGroup, setEditingGroup] = useState<Group | null>(null)
   const [form, setForm] = useState({ tenant_id: 0, name: '', description: '', status: 1 })
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Group>()
 
   const fetchGroups = async () => {
     try {
@@ -71,14 +74,15 @@ const GroupManage = () => {
     setDialogOpen(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm(t('sso.group.deleteConfirm'))) return
+  const handleDeleteConfirm = async (group: Group) => {
     try {
-      await request.delete(`/sso/groups/${id}`)
+      await request.delete(`/sso/groups/${group.id}`)
       toast.success(t('sso.common.deleteSuccess'))
+      resetDeleting()
       fetchGroups()
     } catch (error: any) {
       toast.error(error.message || t('sso.common.operationFailed'))
+      resetDeleting()
     }
   }
 
@@ -155,13 +159,22 @@ const GroupManage = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(group)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(group.id)}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
+                    <div className="relative">
+                      <TableActions>
+                        <TableActionButton variant="edit" onClick={() => handleEdit(group)} />
+                        <TableActionButton
+                          variant="delete"
+                          ref={(el) => setButtonRef(group.id, el)}
+                          onClick={() => handleDeleteClick(group)}
+                        />
+                      </TableActions>
+                      <DeleteConfirmCard
+                        isOpen={deletingId === group.id}
+                        message={t('sso.group.deleteConfirm')}
+                        onConfirm={() => handleDeleteConfirm(group)}
+                        onCancel={handleDeleteCancel}
+                        buttonRef={getButtonRef(group.id)}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>

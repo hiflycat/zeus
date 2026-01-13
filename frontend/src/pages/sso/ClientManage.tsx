@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Copy, Eye, EyeOff, X } from 'lucide-react'
+import { Plus, Copy, Eye, EyeOff, X } from 'lucide-react'
+import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import {
   Button, Input, Card, CardContent, CardHeader, CardTitle,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableActions, TableActionButton,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
   Label, Badge, Switch,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -45,6 +47,7 @@ const ClientManage = () => {
   const [newRedirectUri, setNewRedirectUri] = useState('')
   const [postLogoutRedirectUris, setPostLogoutRedirectUris] = useState<string[]>([])
   const [newPostLogoutRedirectUri, setNewPostLogoutRedirectUri] = useState('')
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<OIDCClient>()
   const [form, setForm] = useState({
     tenant_id: 0,
     client_id: '',
@@ -146,14 +149,15 @@ const ClientManage = () => {
     setDialogOpen(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm(t('sso.client.deleteConfirm'))) return
+  const handleDeleteConfirm = async (client: OIDCClient) => {
     try {
-      await request.delete(`/sso/clients/${id}`)
+      await request.delete(`/sso/clients/${client.id}`)
       toast.success(t('sso.common.deleteSuccess'))
+      resetDeleting()
       fetchClients()
     } catch (error: any) {
       toast.error(error.message || t('sso.common.operationFailed'))
+      resetDeleting()
     }
   }
 
@@ -290,13 +294,22 @@ const ClientManage = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(client)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(client.id)}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
+                    <div className="relative">
+                      <TableActions>
+                        <TableActionButton variant="edit" onClick={() => handleEdit(client)} />
+                        <TableActionButton
+                          variant="delete"
+                          ref={(el) => setButtonRef(client.id, el)}
+                          onClick={() => handleDeleteClick(client)}
+                        />
+                      </TableActions>
+                      <DeleteConfirmCard
+                        isOpen={deletingId === client.id}
+                        message={t('sso.client.deleteConfirm')}
+                        onConfirm={() => handleDeleteConfirm(client)}
+                        onCancel={handleDeleteCancel}
+                        buttonRef={getButtonRef(client.id)}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>

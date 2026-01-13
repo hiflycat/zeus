@@ -20,7 +20,7 @@ func NewMenuService() *MenuService {
 // Create 创建菜单
 func (s *MenuService) Create(menu *model.Menu) error {
 	// 如果指定了父菜单，检查父菜单是否存在
-	if menu.ParentID != nil {
+	if menu.ParentID != nil && *menu.ParentID > 0 {
 		var parentMenu model.Menu
 		if err := migrations.GetDB().Where("id = ?", *menu.ParentID).First(&parentMenu).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -41,7 +41,7 @@ func (s *MenuService) Update(menuID uint, menu *model.Menu) error {
 	}
 
 	// 如果指定了父菜单，检查父菜单是否存在且不是自己
-	if menu.ParentID != nil {
+	if menu.ParentID != nil && *menu.ParentID > 0 {
 		if *menu.ParentID == menuID {
 			return errors.New("不能将自己设为父菜单")
 		}

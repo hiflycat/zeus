@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Plus, Search } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import { getPermissionList, createPermission, updatePermission, deletePermission, getPermissionResources, Permission, PermissionListParams } from '@/api/permission'
 import { usePagination } from '@/hooks/usePagination'
 import {
@@ -38,8 +39,7 @@ const PermissionList = () => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingPermission, setEditingPermission] = useState<Permission | null>(null)
   const [formData, setFormData] = useState({ name: '', api: '', method: 'GET', resource: '', description: '' })
-  const [deletingPermissionId, setDeletingPermissionId] = useState<number | null>(null)
-  const deleteButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Permission>()
 
   const {
     data: permissions,
@@ -95,24 +95,15 @@ const PermissionList = () => {
     setDialogOpen(true)
   }
 
-  const handleDeleteClick = (permission: Permission) => {
-    setDeletingPermissionId(permission.id!)
-  }
-
   const handleDeleteConfirm = async (permission: Permission) => {
     try {
       await deletePermission(permission.id!)
       toast.success(t('permission.deleteSuccess'))
-      setDeletingPermissionId(null)
+      resetDeleting()
       refresh()
     } catch (error: any) {
-      // 错误提示已在响应拦截器中根据错误码显示
-      setDeletingPermissionId(null)
+      resetDeleting()
     }
-  }
-
-  const handleDeleteCancel = () => {
-    setDeletingPermissionId(null)
   }
 
   const handleSubmit = async () => {
@@ -214,22 +205,18 @@ const PermissionList = () => {
                     <div className="relative">
                       <TableActions>
                         <TableActionButton variant="edit" onClick={() => handleEdit(permission)} />
-                        <TableActionButton 
-                          variant="delete" 
-                          ref={(el) => {
-                            if (el && permission.id) {
-                              deleteButtonRefs.current.set(permission.id, el)
-                            }
-                          }}
-                          onClick={() => handleDeleteClick(permission)} 
+                        <TableActionButton
+                          variant="delete"
+                          ref={(el) => setButtonRef(permission.id!, el)}
+                          onClick={() => handleDeleteClick(permission)}
                         />
                       </TableActions>
                       <DeleteConfirmCard
-                        isOpen={deletingPermissionId === permission.id}
+                        isOpen={deletingId === permission.id}
                         message={t('permission.deleteConfirm', { name: permission.name })}
                         onConfirm={() => handleDeleteConfirm(permission)}
                         onCancel={handleDeleteCancel}
-                        buttonRef={deleteButtonRefs.current.get(permission.id!) || null}
+                        buttonRef={getButtonRef(permission.id!)}
                       />
                     </div>
                   </TableCell>

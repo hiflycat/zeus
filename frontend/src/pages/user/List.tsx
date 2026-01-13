@@ -1,8 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Plus, Search } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import { getUserList, createUser, updateUser, deleteUser, User, UserListParams } from '@/api/user'
 import { getRoleList, Role } from '@/api/role'
 import { usePagination } from '@/hooks/usePagination'
@@ -41,8 +42,7 @@ const UserList = () => {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [formData, setFormData] = useState({ username: '', email: '', password: '', role_ids: [] as number[], status: 1 })
   const [changePassword, setChangePassword] = useState(false)
-  const [deletingUserId, setDeletingUserId] = useState<number | null>(null)
-  const deleteButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<User>()
 
   const {
     data: users,
@@ -89,24 +89,15 @@ const UserList = () => {
     setDialogOpen(true)
   }
 
-  const handleDeleteClick = (user: User) => {
-    setDeletingUserId(user.id!)
-  }
-
   const handleDeleteConfirm = async (user: User) => {
     try {
       await deleteUser(user.id!)
       toast.success(t('user.deleteSuccess'))
-      setDeletingUserId(null)
+      resetDeleting()
       refresh()
     } catch (error: any) {
-      // 错误提示已在响应拦截器中根据错误码显示
-      setDeletingUserId(null)
+      resetDeleting()
     }
-  }
-
-  const handleDeleteCancel = () => {
-    setDeletingUserId(null)
   }
 
   const handleSubmit = async () => {
@@ -210,22 +201,18 @@ const UserList = () => {
                     <div className="relative">
                       <TableActions>
                         <TableActionButton variant="edit" onClick={() => handleEdit(user)} />
-                        <TableActionButton 
-                          variant="delete" 
-                          ref={(el) => {
-                            if (el && user.id) {
-                              deleteButtonRefs.current.set(user.id, el)
-                            }
-                          }}
-                          onClick={() => handleDeleteClick(user)} 
+                        <TableActionButton
+                          variant="delete"
+                          ref={(el) => setButtonRef(user.id!, el)}
+                          onClick={() => handleDeleteClick(user)}
                         />
                       </TableActions>
                       <DeleteConfirmCard
-                        isOpen={deletingUserId === user.id}
+                        isOpen={deletingId === user.id}
                         message={t('user.deleteConfirm', { username: user.username })}
                         onConfirm={() => handleDeleteConfirm(user)}
                         onCancel={handleDeleteCancel}
-                        buttonRef={user.id ? deleteButtonRefs.current.get(user.id) || null : null}
+                        buttonRef={getButtonRef(user.id!)}
                       />
                     </div>
                   </TableCell>

@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Plus, Search, ChevronRight, ChevronDown, Globe } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import {
   getNavigationCategoryList,
   createNavigationCategory,
@@ -82,28 +83,7 @@ const CategoryManagement = () => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<NavigationCategory | null>(null)
   const [expandedRows, setExpandedRows] = useState<number[]>([])
-  const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null)
-  const deleteConfirmRef = useRef<HTMLDivElement>(null)
-  const deleteButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (deletingCategoryId && deleteConfirmRef.current && !deleteConfirmRef.current.contains(event.target as Node)) {
-        const button = deleteButtonRefs.current.get(deletingCategoryId)
-        if (button && button.contains(event.target as Node)) {
-          return
-        }
-        setDeletingCategoryId(null)
-      }
-    }
-    if (deletingCategoryId) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside)
-      }
-    }
-  }, [deletingCategoryId])
-
+  const { deletingId: deletingCategoryId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<NavigationCategory>()
   const [columnWidths, setColumnWidths] = useState<number[]>([])
   const [topCategories, setTopCategories] = useState<NavigationCategory[]>([])
   const hiddenTableRef = useRef<HTMLTableElement>(null)
@@ -232,23 +212,15 @@ const CategoryManagement = () => {
     setDialogOpen(true)
   }
 
-  const handleDeleteClick = (category: NavigationCategory) => {
-    setDeletingCategoryId(category.id!)
-  }
-
   const handleDeleteConfirm = async (category: NavigationCategory) => {
     try {
       await deleteNavigationCategory(category.id!)
       toast.success(t('navigation.categoryDeleteSuccess'))
-      setDeletingCategoryId(null)
+      resetDeleting()
       refresh()
     } catch (error: any) {
-      setDeletingCategoryId(null)
+      resetDeleting()
     }
-  }
-
-  const handleDeleteCancel = () => {
-    setDeletingCategoryId(null)
   }
 
   const handleSubmit = async () => {
@@ -321,11 +293,7 @@ const CategoryManagement = () => {
                 <TableActionButton variant="edit" onClick={() => handleEdit(category)} />
                 <TableActionButton
                   variant="delete"
-                  ref={(el) => {
-                    if (el && category.id) {
-                      deleteButtonRefs.current.set(category.id, el)
-                    }
-                  }}
+                  ref={(el) => setButtonRef(category.id!, el)}
                   onClick={() => handleDeleteClick(category)}
                 />
               </TableActions>
@@ -334,7 +302,7 @@ const CategoryManagement = () => {
                 message={t('navigation.categoryDeleteConfirm', { name: category.name })}
                 onConfirm={() => handleDeleteConfirm(category)}
                 onCancel={handleDeleteCancel}
-                buttonRef={deleteButtonRefs.current.get(category.id!) || null}
+                buttonRef={getButtonRef(category.id!)}
               />
             </div>
           </TableCell>
@@ -544,29 +512,9 @@ const NavigationManagement = () => {
   const { t } = useTranslation()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingNavigation, setEditingNavigation] = useState<Navigation | null>(null)
-  const [deletingNavigationId, setDeletingNavigationId] = useState<number | null>(null)
-  const deleteConfirmRef = useRef<HTMLDivElement>(null)
-  const deleteButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const { deletingId: deletingNavigationId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Navigation>()
   const [categories, setCategories] = useState<NavigationCategory[]>([])
   const [imageErrors, setImageErrors] = useState<Set<number>>(new Set())
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (deletingNavigationId && deleteConfirmRef.current && !deleteConfirmRef.current.contains(event.target as Node)) {
-        const button = deleteButtonRefs.current.get(deletingNavigationId)
-        if (button && button.contains(event.target as Node)) {
-          return
-        }
-        setDeletingNavigationId(null)
-      }
-    }
-    if (deletingNavigationId) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside)
-      }
-    }
-  }, [deletingNavigationId])
 
   useEffect(() => {
     getNavigationCategoryList()
@@ -654,23 +602,15 @@ const NavigationManagement = () => {
     setDialogOpen(true)
   }
 
-  const handleDeleteClick = (navigation: Navigation) => {
-    setDeletingNavigationId(navigation.id!)
-  }
-
   const handleDeleteConfirm = async (navigation: Navigation) => {
     try {
       await deleteNavigation(navigation.id!)
       toast.success(t('navigation.navigationDeleteSuccess'))
-      setDeletingNavigationId(null)
+      resetDeleting()
       refresh()
     } catch (error: any) {
-      setDeletingNavigationId(null)
+      resetDeleting()
     }
-  }
-
-  const handleDeleteCancel = () => {
-    setDeletingNavigationId(null)
   }
 
   const handleSubmit = async () => {
@@ -792,11 +732,7 @@ const NavigationManagement = () => {
                           <TableActionButton variant="edit" onClick={() => handleEdit(navigation)} />
                           <TableActionButton
                             variant="delete"
-                            ref={(el) => {
-                              if (el && navigation.id) {
-                                deleteButtonRefs.current.set(navigation.id, el)
-                              }
-                            }}
+                            ref={(el) => setButtonRef(navigation.id!, el)}
                             onClick={() => handleDeleteClick(navigation)}
                           />
                         </TableActions>
@@ -805,7 +741,7 @@ const NavigationManagement = () => {
                           message={t('navigation.navigationDeleteConfirm', { name: navigation.name })}
                           onConfirm={() => handleDeleteConfirm(navigation)}
                           onCancel={handleDeleteCancel}
-                          buttonRef={deleteButtonRefs.current.get(navigation.id!) || null}
+                          buttonRef={getButtonRef(navigation.id!)}
                         />
                       </div>
                     </TableCell>

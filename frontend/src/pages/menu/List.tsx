@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Plus, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import { getMenuList, createMenu, updateMenu, deleteMenu, Menu } from '@/api/menu'
 import { iconMap, iconList } from '@/components/IconSelector'
 import {
@@ -37,31 +38,10 @@ const MenuList = () => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingMenu, setEditingMenu] = useState<Menu | null>(null)
   const [expandedRows, setExpandedRows] = useState<number[]>([])
-  const [deletingMenuId, setDeletingMenuId] = useState<number | null>(null)
-  const deleteConfirmRef = useRef<HTMLDivElement>(null)
-  const deleteButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Menu>()
   const [menus, setMenus] = useState<Menu[]>([])
   const [loading, setLoading] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState('')
-
-  // 点击外部关闭确认卡片
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (deletingMenuId && deleteConfirmRef.current && !deleteConfirmRef.current.contains(event.target as Node)) {
-        const button = deleteButtonRefs.current.get(deletingMenuId)
-        if (button && button.contains(event.target as Node)) {
-          return
-        }
-        setDeletingMenuId(null)
-      }
-    }
-    if (deletingMenuId) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside)
-      }
-    }
-  }, [deletingMenuId])
   const [columnWidths, setColumnWidths] = useState<number[]>([])
   const [topMenus, setTopMenus] = useState<Menu[]>([])
   const hiddenTableRef = useRef<HTMLTableElement>(null)
@@ -199,23 +179,15 @@ const MenuList = () => {
     setDialogOpen(true)
   }
 
-  const handleDeleteClick = (menu: Menu) => {
-    setDeletingMenuId(menu.id!)
-  }
-
   const handleDeleteConfirm = async (menu: Menu) => {
     try {
       await deleteMenu(menu.id!)
       toast.success(t('menu.deleteSuccess'))
-      setDeletingMenuId(null)
+      resetDeleting()
       fetchMenus()
     } catch {
-      setDeletingMenuId(null)
+      resetDeleting()
     }
-  }
-
-  const handleDeleteCancel = () => {
-    setDeletingMenuId(null)
   }
 
   const handleSubmit = async () => {
@@ -298,20 +270,16 @@ const MenuList = () => {
                 <TableActionButton variant="edit" onClick={() => handleEdit(menu)} />
                 <TableActionButton
                   variant="delete"
-                  ref={(el) => {
-                    if (el && menu.id) {
-                      deleteButtonRefs.current.set(menu.id, el)
-                    }
-                  }}
+                  ref={(el) => setButtonRef(menu.id!, el)}
                   onClick={() => handleDeleteClick(menu)}
                 />
               </TableActions>
               <DeleteConfirmCard
-                isOpen={deletingMenuId === menu.id}
+                isOpen={deletingId === menu.id}
                 message={t('menu.deleteConfirm', { name: menu.name })}
                 onConfirm={() => handleDeleteConfirm(menu)}
                 onCancel={handleDeleteCancel}
-                buttonRef={deleteButtonRefs.current.get(menu.id!) || null}
+                buttonRef={getButtonRef(menu.id!)}
               />
             </div>
           </TableCell>

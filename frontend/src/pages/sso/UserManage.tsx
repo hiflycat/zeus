@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Search, Key, Users, ChevronDown } from 'lucide-react'
+import { Plus, Search, Key, Users, ChevronDown } from 'lucide-react'
+import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import {
   Button, Input, Card, CardContent, CardHeader, CardTitle,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableActions, TableActionButton,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
   Label, Badge, Switch,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -51,6 +53,7 @@ const UserManage = () => {
   const [form, setForm] = useState({ tenant_id: 0, username: '', password: '', email: '', display_name: '', phone: '', status: 1 })
   const [newPassword, setNewPassword] = useState('')
   const [selectedGroups, setSelectedGroups] = useState<number[]>([])
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<SSOUser>()
 
   const fetchUsers = async () => {
     try {
@@ -100,14 +103,15 @@ const UserManage = () => {
     setDialogOpen(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm(t('sso.user.deleteConfirm'))) return
+  const handleDeleteConfirm = async (user: SSOUser) => {
     try {
-      await request.delete(`/sso/users/${id}`)
+      await request.delete(`/sso/users/${user.id}`)
       toast.success(t('sso.common.deleteSuccess'))
+      resetDeleting()
       fetchUsers()
     } catch (error: any) {
       toast.error(error.message || t('sso.common.operationFailed'))
+      resetDeleting()
     }
   }
 
@@ -248,19 +252,24 @@ const UserManage = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(user)} title={t('common.edit')}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => openPasswordDialog(user)} title={t('sso.user.resetPassword')}>
-                        <Key className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => openGroupDialog(user)} title={t('sso.user.assignGroups')}>
-                        <Users className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(user.id)} title={t('common.delete')}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
+                    <div className="relative">
+                      <TableActions>
+                        <TableActionButton variant="edit" onClick={() => handleEdit(user)} />
+                        <TableActionButton icon={<Key className="h-3.5 w-3.5" />} onClick={() => openPasswordDialog(user)} title={t('sso.user.resetPassword')} />
+                        <TableActionButton icon={<Users className="h-3.5 w-3.5" />} onClick={() => openGroupDialog(user)} title={t('sso.user.assignGroups')} />
+                        <TableActionButton
+                          variant="delete"
+                          ref={(el) => setButtonRef(user.id, el)}
+                          onClick={() => handleDeleteClick(user)}
+                        />
+                      </TableActions>
+                      <DeleteConfirmCard
+                        isOpen={deletingId === user.id}
+                        message={t('sso.user.deleteConfirm')}
+                        onConfirm={() => handleDeleteConfirm(user)}
+                        onCancel={handleDeleteCancel}
+                        buttonRef={getButtonRef(user.id)}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>

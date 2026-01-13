@@ -24,7 +24,7 @@ func NewGormLogger(logLevel logger.LogLevel, slowThreshold time.Duration) *GormL
 		ZapLogger:                 GetLogger(),
 		LogLevel:                  logLevel,
 		SlowThreshold:             slowThreshold,
-		IgnoreRecordNotFoundError: false,
+		IgnoreRecordNotFoundError: true,
 	}
 }
 

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Plus, Pencil, Trash2, Search } from 'lucide-react'
+import { Plus, Search } from 'lucide-react'
+import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import {
   Button, Input, Card, CardContent, CardHeader, CardTitle,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableActions, TableActionButton,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
   Label, Switch
 } from '@/components/ui-tw'
@@ -25,10 +27,11 @@ const TenantManage = () => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
   const [form, setForm] = useState({ name: '', domain: '', status: 1 })
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Tenant>()
 
   const fetchTenants = async () => {
     try {
-      const res: any = await request.get('/sso/tenants', { params: { page: 1, page_size: 10, name: search } })
+      const res: any = await request.get('/sso/tenants', { params: { page: 1, page_size: 100, name: search } })
       setTenants(res.list || [])
     } catch (error) {
       console.error(error)
@@ -51,14 +54,15 @@ const TenantManage = () => {
     setDialogOpen(true)
   }
 
-  const handleDelete = async (id: number) => {
-    if (!confirm(t('sso.tenant.deleteConfirm'))) return
+  const handleDeleteConfirm = async (tenant: Tenant) => {
     try {
-      await request.delete(`/sso/tenants/${id}`)
+      await request.delete(`/sso/tenants/${tenant.id}`)
       toast.success(t('sso.common.deleteSuccess'))
+      resetDeleting()
       fetchTenants()
     } catch (error: any) {
       toast.error(error.message || t('sso.common.operationFailed'))
+      resetDeleting()
     }
   }
 
@@ -133,13 +137,22 @@ const TenantManage = () => {
                     />
                   </TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" onClick={() => handleEdit(tenant)}>
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => handleDelete(tenant.id)}>
-                        <Trash2 className="w-4 h-4 text-red-500" />
-                      </Button>
+                    <div className="relative">
+                      <TableActions>
+                        <TableActionButton variant="edit" onClick={() => handleEdit(tenant)} />
+                        <TableActionButton
+                          variant="delete"
+                          ref={(el) => setButtonRef(tenant.id, el)}
+                          onClick={() => handleDeleteClick(tenant)}
+                        />
+                      </TableActions>
+                      <DeleteConfirmCard
+                        isOpen={deletingId === tenant.id}
+                        message={t('sso.tenant.deleteConfirm')}
+                        onConfirm={() => handleDeleteConfirm(tenant)}
+                        onCancel={handleDeleteCancel}
+                        buttonRef={getButtonRef(tenant.id)}
+                      />
                     </div>
                   </TableCell>
                 </TableRow>

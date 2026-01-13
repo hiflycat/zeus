@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
 import { Plus, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
+import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import { getRoleList, createRole, updateRole, deleteRole, assignPermissions, assignMenus, Role, RoleListParams } from '@/api/role'
 import { getPermissionList, Permission } from '@/api/permission'
 import { getMenuList, Menu } from '@/api/menu'
@@ -53,8 +54,7 @@ const RoleList = () => {
   const [editingRole, setEditingRole] = useState<Role | null>(null)
   const [assigningRole, setAssigningRole] = useState<Role | null>(null)
   const [formData, setFormData] = useState({ name: '', description: '', status: 1 })
-  const [deletingRoleId, setDeletingRoleId] = useState<number | null>(null)
-  const deleteButtonRefs = useRef<Map<number, HTMLButtonElement>>(new Map())
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Role>()
   const [selectedPermissions, setSelectedPermissions] = useState<number[]>([])
   const [selectedMenus, setSelectedMenus] = useState<number[]>([])
   const [expandedMenus, setExpandedMenus] = useState<number[]>([])
@@ -110,24 +110,15 @@ const RoleList = () => {
     setDialogOpen(true)
   }
 
-  const handleDeleteClick = (role: Role) => {
-    setDeletingRoleId(role.id!)
-  }
-
   const handleDeleteConfirm = async (role: Role) => {
     try {
       await deleteRole(role.id!)
       toast.success(t('role.deleteSuccess'))
-      setDeletingRoleId(null)
+      resetDeleting()
       refresh()
     } catch (error: any) {
-      // 错误提示已在响应拦截器中根据错误码显示
-      setDeletingRoleId(null)
+      resetDeleting()
     }
-  }
-
-  const handleDeleteCancel = () => {
-    setDeletingRoleId(null)
   }
 
   const handleSubmit = async () => {
@@ -447,22 +438,18 @@ const RoleList = () => {
                       <TableActions>
                         <TableActionButton variant="settings" onClick={() => handleAssign(role)} />
                         <TableActionButton variant="edit" onClick={() => handleEdit(role)} />
-                        <TableActionButton 
-                          variant="delete" 
-                          ref={(el) => {
-                            if (el && role.id) {
-                              deleteButtonRefs.current.set(role.id, el)
-                            }
-                          }}
-                          onClick={() => handleDeleteClick(role)} 
+                        <TableActionButton
+                          variant="delete"
+                          ref={(el) => setButtonRef(role.id!, el)}
+                          onClick={() => handleDeleteClick(role)}
                         />
                       </TableActions>
                       <DeleteConfirmCard
-                        isOpen={deletingRoleId === role.id}
+                        isOpen={deletingId === role.id}
                         message={t('role.deleteConfirm', { name: role.name })}
                         onConfirm={() => handleDeleteConfirm(role)}
                         onCancel={handleDeleteCancel}
-                        buttonRef={deleteButtonRefs.current.get(role.id!) || null}
+                        buttonRef={getButtonRef(role.id!)}
                       />
                     </div>
                   </TableCell>
