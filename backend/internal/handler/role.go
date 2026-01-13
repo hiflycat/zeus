@@ -1,0 +1,146 @@
+package handler
+
+import (
+	"strconv"
+
+	"github.com/gin-gonic/gin"
+	"backend/internal/model"
+	"backend/internal/service"
+	"backend/pkg/response"
+)
+
+// RoleHandler 角色处理器
+type RoleHandler struct {
+	roleService *service.RoleService
+}
+
+// NewRoleHandler 创建角色处理器
+func NewRoleHandler() *RoleHandler {
+	return &RoleHandler{
+		roleService: service.NewRoleService(),
+	}
+}
+
+// Create 创建角色
+func (h *RoleHandler) Create(c *gin.Context) {
+	var role model.Role
+	if err := c.ShouldBindJSON(&role); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.roleService.Create(&role); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, role)
+}
+
+// Update 更新角色
+func (h *RoleHandler) Update(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	roleID := uint(id)
+
+	var role model.Role
+	if err := c.ShouldBindJSON(&role); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.roleService.Update(roleID, &role); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+// Delete 删除角色
+func (h *RoleHandler) Delete(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	roleID := uint(id)
+
+	if err := h.roleService.Delete(roleID); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+// GetByID 根据 ID 获取角色
+func (h *RoleHandler) GetByID(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	roleID := uint(id)
+
+	role, err := h.roleService.GetByID(roleID)
+	if err != nil {
+		response.NotFound(c, "角色不存在")
+		return
+	}
+
+	response.Success(c, role)
+}
+
+// List 获取角色列表
+func (h *RoleHandler) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	keyword := c.Query("keyword")
+
+	roles, total, err := h.roleService.List(page, pageSize, keyword)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list":      roles,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
+}
+
+// AssignPermissions 分配权限
+func (h *RoleHandler) AssignPermissions(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	roleID := uint(id)
+
+	var req struct {
+		PermissionIDs []uint `json:"permission_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.roleService.AssignPermissions(roleID, req.PermissionIDs); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}
+
+// AssignMenus 分配菜单
+func (h *RoleHandler) AssignMenus(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	roleID := uint(id)
+
+	var req struct {
+		MenuIDs []uint `json:"menu_ids" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	if err := h.roleService.AssignMenus(roleID, req.MenuIDs); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	response.Success(c, nil)
+}

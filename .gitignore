@@ -1,0 +1,50 @@
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+vendor/
+
+# Backend
+backend/.env
+backend/config.yaml
+backend/logs/
+backend/*.log
+backend/statik/
+backend/dist/
+backend/bin/
+backend/server
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+frontend/.vite/
+frontend/.DS_Store
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+.shared/
+.claude/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Database
+*.db
+*.sqlite

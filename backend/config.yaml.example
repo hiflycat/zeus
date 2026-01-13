@@ -1,0 +1,48 @@
+server:
+  port: 8080
+  mode: debug # debug, release, test
+  read_timeout: 10s
+  write_timeout: 10s
+  name: Zeus # 服务名称
+
+database:
+  host: localhost
+  port: 3306
+  user: root
+  password: password
+  dbname: go_scaffold
+  charset: utf8mb4
+  max_open_conns: 100
+  max_idle_conns: 10
+  log_level: warn # silent, error, warn, info
+  slow_threshold: 200 # 慢查询阈值（毫秒）
+
+jwt:
+  secret: your-secret-key-change-in-production
+  expiration: 24h
+  issuer: go-scaffold
+
+log:
+  level: info # debug, info, warn, error
+  format: console # json, console
+  output: stdout # stdout, file
+  filename: logs/app.log
+  max_size: 100 # MB
+  max_backups: 3
+  max_age: 7 # days
+  compress: true
+
+# SSO 配置（OIDC Provider + LDAP Server）
+sso:
+  enabled: false # 是否启用 SSO 服务
+  issuer: http://localhost:8080 # OIDC issuer URL
+  # OIDC Provider 配置
+  oidc:
+    access_token_ttl: 3600      # Access Token 有效期（秒），默认 1 小时
+    refresh_token_ttl: 604800   # Refresh Token 有效期（秒），默认 7 天
+    code_ttl: 600               # 授权码有效期（秒），默认 10 分钟
+  # LDAP Server 配置
+  ldap:
+    enabled: false              # 是否启用 LDAP 服务
+    port: 389                   # LDAP 端口
+    base_dn: dc=zeus,dc=local   # Base DN
