@@ -6,15 +6,10 @@ import (
 	"gorm.io/gorm"
 )
 
-// BaseModel 基础模型
+// BaseModel 基础模型（带软删除）
 type BaseModel struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// BaseModelWithSoftDelete 带软删除的基础模型
-type BaseModelWithSoftDelete struct {
-	BaseModel
+	ID        uint           `gorm:"primarykey" json:"id"`
+	CreatedAt time.Time      `json:"created_at"`
+	UpdatedAt time.Time      `json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"index" json:"-"`
 }

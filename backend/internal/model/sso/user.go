@@ -4,7 +4,7 @@ import "time"
 
 // User SSO 用户模型
 type User struct {
-	BaseModelWithSoftDelete
+	BaseModel
 	TenantID          uint       `gorm:"index;not null;comment:租户ID" json:"tenant_id"`
 	Username          string     `gorm:"type:varchar(50);not null;comment:用户名" json:"username"`
 	Password          string     `gorm:"type:varchar(255);not null;comment:密码" json:"-"`

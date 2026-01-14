@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Search, ChevronRight, ChevronDown } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
-import { getRoleList, createRole, updateRole, deleteRole, assignPermissions, assignMenus, Role, RoleListParams } from '@/api/role'
-import { getPermissionList, Permission } from '@/api/permission'
+import { getRoleList, createRole, updateRole, deleteRole, getRolePolicies, assignPolicies, assignMenus, Role, RoleListParams } from '@/api/role'
+import { getAllAPIDefinitions, APIDefinition } from '@/api/api-definition'
 import { getMenuList, Menu } from '@/api/menu'
 import { usePagination } from '@/hooks/usePagination'
 import { getMenuTranslation } from '@/utils/menuTranslation'
@@ -47,7 +47,7 @@ import {
 
 const RoleList = () => {
   const { t } = useTranslation()
-  const [permissions, setPermissions] = useState<Permission[]>([])
+  const [apiDefinitions, setApiDefinitions] = useState<APIDefinition[]>([])
   const [menus, setMenus] = useState<Menu[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -55,12 +55,12 @@ const RoleList = () => {
   const [assigningRole, setAssigningRole] = useState<Role | null>(null)
   const [formData, setFormData] = useState({ name: '', description: '', status: 1 })
   const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Role>()
-  const [selectedPermissions, setSelectedPermissions] = useState<number[]>([])
+  const [selectedAPIs, setSelectedAPIs] = useState<number[]>([])
   const [selectedMenus, setSelectedMenus] = useState<number[]>([])
   const [expandedMenus, setExpandedMenus] = useState<number[]>([])
-  const [expandedPermGroups, setExpandedPermGroups] = useState<string[]>([])
+  const [expandedAPIGroups, setExpandedAPIGroups] = useState<string[]>([])
   const [menuFilter, setMenuFilter] = useState('')
-  const [permissionFilter, setPermissionFilter] = useState('')
+  const [apiFilter, setApiFilter] = useState('')
 
   const {
     data: roles,
@@ -81,21 +81,17 @@ const RoleList = () => {
     defaultPageSize: 10,
   })
 
-  // 获取权限和菜单列表（只需要加载一次，用于角色配置，获取所有数据）
   useEffect(() => {
       Promise.all([
-        getPermissionList({ page: 1, page_size: 1000 }), // 获取所有权限用于角色配置
-        getMenuList({ page: 1, page_size: 1000 }), // 带分页参数,获取菜单列表
+        getAllAPIDefinitions(),
+        getMenuList({ page: 1, page_size: 1000 }),
       ])
-        .then(([permissionsRes, menusRes]) => {
-          setPermissions(permissionsRes.list || [])
-          // 判断返回类型：如果是分页响应则取 list，如果是数组则直接使用
+        .then(([apiRes, menusRes]) => {
+          setApiDefinitions(apiRes || [])
           const menuList = Array.isArray(menusRes) ? menusRes : (menusRes.list || [])
           setMenus(menuList)
         })
-        .catch(() => {
-          // 错误提示已在响应拦截器中根据错误码显示
-        })
+        .catch(() => {})
   }, [])
 
   const handleCreate = () => {
@@ -136,24 +132,27 @@ const RoleList = () => {
       }
       setDialogOpen(false)
       refresh()
-    } catch (error: any) {
-      // 错误提示已在响应拦截器中根据错误码显示
-    }
+    } catch (error: any) {}
   }
 
-  const handleAssign = (role: Role) => {
+  const handleAssign = async (role: Role) => {
     setAssigningRole(role)
-    setSelectedPermissions((role.permissions?.map(p => p.id).filter((id): id is number => id !== undefined)) || [])
+    // 获取角色已分配的 API 权限
+    try {
+      const apiIds = await getRolePolicies(role.id!)
+      setSelectedAPIs(apiIds || [])
+    } catch {
+      setSelectedAPIs([])
+    }
     setSelectedMenus((role.menus?.map(m => m.id).filter((id): id is number => id !== undefined)) || [])
-    // 默认展开所有权限分组
-    const allResources = [...new Set(permissions.map(p => p.resource || '其他'))]
-    setExpandedPermGroups(allResources)
+    // 默认展开所有 API 分组
+    const allResources = [...new Set(apiDefinitions.map(a => a.resource || '其他'))]
+    setExpandedAPIGroups(allResources)
     // 默认展开所有有子菜单的菜单
     const parentMenuIds = menus.filter(m => menus.some(sub => sub.parent_id === m.id)).map(m => m.id).filter((id): id is number => id !== undefined)
     setExpandedMenus(parentMenuIds)
-    // 清空筛选
     setMenuFilter('')
-    setPermissionFilter('')
+    setApiFilter('')
     setDrawerOpen(true)
   }
 
@@ -161,15 +160,13 @@ const RoleList = () => {
     if (!assigningRole) return
     try {
       await Promise.all([
-        assignPermissions(assigningRole.id!, selectedPermissions),
+        assignPolicies(assigningRole.id!, selectedAPIs),
         assignMenus(assigningRole.id!, selectedMenus),
       ])
       toast.success('分配成功')
       setDrawerOpen(false)
       refresh()
-    } catch (error: any) {
-      // 错误提示已在响应拦截器中根据错误码显示
-    }
+    } catch (error: any) {}
   }
 
   const handleStatusChange = async (role: Role, checked: boolean) => {
@@ -177,9 +174,7 @@ const RoleList = () => {
       await updateRole(role.id!, { ...role, status: checked ? 1 : 0 })
       toast.success('状态更新成功')
       refresh()
-    } catch (error: any) {
-      // 错误提示已在响应拦截器中根据错误码显示
-    }
+    } catch (error: any) {}
   }
 
   // 构建菜单树
@@ -194,6 +189,47 @@ const RoleList = () => {
   }
 
   const menuTree = useMemo(() => buildMenuTree(menus), [menus])
+
+  // 获取菜单的所有子菜单 ID（递归）
+  const getAllChildIds = (menu: any): number[] => {
+    const ids: number[] = []
+    if (menu.children?.length > 0) {
+      menu.children.forEach((child: any) => {
+        ids.push(child.id)
+        ids.push(...getAllChildIds(child))
+      })
+    }
+    return ids
+  }
+
+  // 获取菜单的所有父菜单 ID
+  const getAllParentIds = (menuId: number): number[] => {
+    const ids: number[] = []
+    const findParent = (id: number) => {
+      const menu = menus.find(m => m.id === id)
+      if (menu?.parent_id) {
+        ids.push(menu.parent_id)
+        findParent(menu.parent_id)
+      }
+    }
+    findParent(menuId)
+    return ids
+  }
+
+  // 处理菜单选择变化
+  const handleMenuCheck = (menu: any, checked: boolean) => {
+    const menuId = menu.id ?? 0
+    if (checked) {
+      // 选中：添加自己 + 所有子菜单 + 所有父菜单
+      const childIds = getAllChildIds(menu)
+      const parentIds = getAllParentIds(menuId)
+      setSelectedMenus(prev => [...new Set([...prev, menuId, ...childIds, ...parentIds])])
+    } else {
+      // 取消：移除自己 + 所有子菜单
+      const childIds = getAllChildIds(menu)
+      setSelectedMenus(prev => prev.filter(id => id !== menuId && !childIds.includes(id)))
+    }
+  }
 
   // 筛选菜单
   const filterMenuTree = (tree: any[], keyword: string): any[] => {
@@ -210,57 +246,55 @@ const RoleList = () => {
 
   const filteredMenuTree = useMemo(() => filterMenuTree(menuTree, menuFilter), [menuTree, menuFilter])
 
-  // 按 resource 分组权限
-  const permissionGroups = useMemo(() => {
-    const groups: { [key: string]: Permission[] } = {}
-    permissions.forEach(p => {
-      const resource = p.resource || t('role.other')
+  // 按 resource 分组 API
+  const apiGroups = useMemo(() => {
+    const groups: { [key: string]: APIDefinition[] } = {}
+    apiDefinitions.forEach(a => {
+      const resource = a.resource || t('role.other')
       if (!groups[resource]) {
         groups[resource] = []
       }
-      groups[resource].push(p)
+      groups[resource].push(a)
     })
     return groups
-  }, [permissions, t])
+  }, [apiDefinitions, t])
 
-  // 筛选权限分组（与菜单筛选逻辑一致）
-  const filteredPermissionGroups = useMemo(() => {
-    if (!permissionFilter) return permissionGroups
-    const keyword = permissionFilter.toLowerCase()
-    const filtered: { [key: string]: Permission[] } = {}
-    Object.entries(permissionGroups).forEach(([resource, perms]) => {
-      // 如果资源名称匹配，显示该分组下所有权限
+  // 筛选 API 分组
+  const filteredAPIGroups = useMemo(() => {
+    if (!apiFilter) return apiGroups
+    const keyword = apiFilter.toLowerCase()
+    const filtered: { [key: string]: APIDefinition[] } = {}
+    Object.entries(apiGroups).forEach(([resource, apis]) => {
       if (resource.toLowerCase().includes(keyword)) {
-        filtered[resource] = perms
+        filtered[resource] = apis
       } else {
-        // 否则筛选匹配的权限
-        const matchedPerms = perms.filter(p =>
-          p.name.toLowerCase().includes(keyword) ||
-          p.api.toLowerCase().includes(keyword) ||
-          p.method.toLowerCase().includes(keyword)
+        const matchedAPIs = apis.filter(a =>
+          a.name.toLowerCase().includes(keyword) ||
+          a.path.toLowerCase().includes(keyword) ||
+          a.method.toLowerCase().includes(keyword)
         )
-        if (matchedPerms.length > 0) {
-          filtered[resource] = matchedPerms
+        if (matchedAPIs.length > 0) {
+          filtered[resource] = matchedAPIs
         }
       }
     })
     return filtered
-  }, [permissionGroups, permissionFilter])
+  }, [apiGroups, apiFilter])
 
-  // 渲染权限分组
-  const renderPermissionGroup = (resource: string, perms: Permission[]) => {
-    const isExpanded = expandedPermGroups.includes(resource)
-    const groupPermIds = perms.map(p => p.id ?? 0)
-    const selectedInGroup = groupPermIds.filter(id => selectedPermissions.includes(id))
-    const isAllSelected = selectedInGroup.length === perms.length
-    const isPartialSelected = selectedInGroup.length > 0 && selectedInGroup.length < perms.length
+  // 渲染 API 分组
+  const renderAPIGroup = (resource: string, apis: APIDefinition[]) => {
+    const isExpanded = expandedAPIGroups.includes(resource)
+    const groupAPIIds = apis.map(a => a.id ?? 0)
+    const selectedInGroup = groupAPIIds.filter(id => selectedAPIs.includes(id))
+    const isAllSelected = selectedInGroup.length === apis.length
+    const isPartialSelected = selectedInGroup.length > 0 && selectedInGroup.length < apis.length
 
     return (
       <div key={resource}>
         <div
           className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-accent cursor-pointer"
           onClick={() => {
-            setExpandedPermGroups(prev =>
+            setExpandedAPIGroups(prev =>
               prev.includes(resource)
                 ? prev.filter(r => r !== resource)
                 : [...prev, resource]
@@ -277,48 +311,46 @@ const RoleList = () => {
             }}
             onCheckedChange={(checked) => {
               if (checked) {
-                // 选中该分组下所有权限
-                setSelectedPermissions(prev => [...new Set([...prev, ...groupPermIds])])
+                setSelectedAPIs(prev => [...new Set([...prev, ...groupAPIIds])])
               } else {
-                // 取消选中该分组下所有权限
-                setSelectedPermissions(prev => prev.filter(id => !groupPermIds.includes(id)))
+                setSelectedAPIs(prev => prev.filter(id => !groupAPIIds.includes(id)))
               }
             }}
             onClick={(e) => e.stopPropagation()}
           />
           <span className="text-sm font-medium">{resource}</span>
-          <Badge variant="secondary" className="ml-auto text-xs">{selectedInGroup.length}/{perms.length}</Badge>
+          <Badge variant="secondary" className="ml-auto text-xs">{selectedInGroup.length}/{apis.length}</Badge>
         </div>
         {isExpanded && (
           <div className="ml-6">
-            {perms.map(permission => {
-              const permId = permission.id ?? 0
+            {apis.map(api => {
+              const apiId = api.id ?? 0
               return (
                 <div
-                  key={permId}
+                  key={apiId}
                   className="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-accent"
                 >
                   <div className="w-4" />
                   <Checkbox
-                    checked={selectedPermissions.includes(permId)}
+                    checked={selectedAPIs.includes(apiId)}
                     onCheckedChange={(checked) => {
                       if (checked) {
-                        setSelectedPermissions(prev => [...prev, permId])
+                        setSelectedAPIs(prev => [...prev, apiId])
                       } else {
-                        setSelectedPermissions(prev => prev.filter(id => id !== permId))
+                        setSelectedAPIs(prev => prev.filter(id => id !== apiId))
                       }
                     }}
                   />
-                  <span className="text-sm">{permission.name}</span>
+                  <span className="text-sm">{api.name}</span>
                   <div className="ml-auto flex items-center gap-1">
                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
-                      permission.method === 'GET' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                      permission.method === 'POST' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-                      permission.method === 'PUT' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' :
-                      permission.method === 'DELETE' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
+                      api.method === 'GET' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+                      api.method === 'POST' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
+                      api.method === 'PUT' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' :
+                      api.method === 'DELETE' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
                       'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-                    }`}>{permission.method}</span>
-                    <code className="text-xs bg-muted px-1 py-0.5 rounded max-w-[200px] truncate">{permission.api}</code>
+                    }`}>{api.method}</span>
+                    <code className="text-xs bg-muted px-1 py-0.5 rounded max-w-[200px] truncate">{api.path}</code>
                   </div>
                 </div>
               )
@@ -360,13 +392,7 @@ const RoleList = () => {
           )}
           <Checkbox
             checked={isChecked}
-            onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedMenus(prev => [...prev, menuId])
-              } else {
-                setSelectedMenus(prev => prev.filter(id => id !== menuId))
-              }
-            }}
+            onCheckedChange={(checked) => handleMenuCheck(menu, !!checked)}
             onClick={(e) => e.stopPropagation()}
           />
           <span className="text-sm">{getMenuTranslation(menu.name, t)}</span>
@@ -514,7 +540,7 @@ const RoleList = () => {
             <Tabs defaultValue="menus" className="w-full">
               <TabsList className="w-full">
                 <TabsTrigger value="menus" className="flex-1">{t('role.roleMenus')}</TabsTrigger>
-                <TabsTrigger value="permissions" className="flex-1">{t('role.rolePermissions')}</TabsTrigger>
+                <TabsTrigger value="apis" className="flex-1">{t('role.roleAPIs')}</TabsTrigger>
               </TabsList>
               <TabsContent value="menus" className="mt-4">
                 <div className="space-y-4">
@@ -528,17 +554,17 @@ const RoleList = () => {
                   </ScrollArea>
                 </div>
               </TabsContent>
-              <TabsContent value="permissions" className="mt-4">
+              <TabsContent value="apis" className="mt-4">
                 <div className="space-y-4">
                   <Input
-                    placeholder={t('role.filterPermission')}
-                    value={permissionFilter}
-                    onChange={(e) => setPermissionFilter(e.target.value)}
+                    placeholder={t('role.filterAPI')}
+                    value={apiFilter}
+                    onChange={(e) => setApiFilter(e.target.value)}
                   />
                   <ScrollArea className="h-[400px] border rounded-md p-2">
                     <div className="space-y-1">
-                      {Object.entries(filteredPermissionGroups).map(([resource, perms]) =>
-                        renderPermissionGroup(resource, perms)
+                      {Object.entries(filteredAPIGroups).map(([resource, apis]) =>
+                        renderAPIGroup(resource, apis)
                       )}
                     </div>
                   </ScrollArea>

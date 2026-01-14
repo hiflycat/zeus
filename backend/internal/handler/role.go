@@ -103,25 +103,39 @@ func (h *RoleHandler) List(c *gin.Context) {
 	})
 }
 
-// AssignPermissions 分配权限
-func (h *RoleHandler) AssignPermissions(c *gin.Context) {
+// AssignPolicies 分配 API 权限
+func (h *RoleHandler) AssignPolicies(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	roleID := uint(id)
 
 	var req struct {
-		PermissionIDs []uint `json:"permission_ids" binding:"required"`
+		APIDefIDs []uint `json:"api_def_ids"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
-	if err := h.roleService.AssignPermissions(roleID, req.PermissionIDs); err != nil {
+	if err := h.roleService.AssignPolicies(roleID, req.APIDefIDs); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 
 	response.Success(c, nil)
+}
+
+// GetPolicies 获取角色的 API 权限
+func (h *RoleHandler) GetPolicies(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	roleID := uint(id)
+
+	apiDefIDs, err := h.roleService.GetPolicies(roleID)
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+
+	response.Success(c, apiDefIDs)
 }
 
 // AssignMenus 分配菜单

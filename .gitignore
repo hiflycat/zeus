@@ -26,6 +26,7 @@ frontend/.env.local
 frontend/.env.production
 frontend/.vite/
 frontend/.DS_Store
+docs/
 
 # IDE
 .idea/

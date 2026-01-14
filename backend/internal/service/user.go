@@ -102,7 +102,7 @@ func (s *UserService) Delete(userID uint) error {
 		return err
 	}
 
-	// 先清理 user_roles 中间表关联
+	// 清理 user_roles 中间表关联
 	if err := migrations.GetDB().Model(&user).Association("Roles").Clear(); err != nil {
 		return err
 	}

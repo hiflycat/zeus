@@ -2,7 +2,9 @@ package service
 
 import (
 	"errors"
+	"strconv"
 
+	casbinPkg "backend/internal/casbin"
 	"backend/internal/model"
 	"backend/migrations"
 )
@@ -67,9 +69,12 @@ func (s *RoleService) Delete(roleID uint) error {
 		return errors.New("该角色正在被使用，无法删除")
 	}
 
-	// 删除 role_permissions 中间表记录
-	if err := migrations.GetDB().Table("role_permissions").Where("role_id = ?", roleID).Delete(nil).Error; err != nil {
-		return err
+	// 删除 Casbin 策略（使用角色 ID）
+	enforcer := casbinPkg.GetEnforcer()
+	if enforcer != nil {
+		roleIDStr := strconv.FormatUint(uint64(roleID), 10)
+		enforcer.RemoveFilteredPolicy(0, roleIDStr)
+		enforcer.SavePolicy()
 	}
 
 	// 删除 role_menus 中间表记录
@@ -84,7 +89,7 @@ func (s *RoleService) Delete(roleID uint) error {
 // GetByID 根据 ID 获取角色
 func (s *RoleService) GetByID(roleID uint) (*model.Role, error) {
 	var role model.Role
-	if err := migrations.GetDB().Preload("Permissions").Preload("Menus").Where("id = ?", roleID).First(&role).Error; err != nil {
+	if err := migrations.GetDB().Preload("Menus").Where("id = ?", roleID).First(&role).Error; err != nil {
 		return nil, err
 	}
 	return &role, nil
@@ -107,28 +112,25 @@ func (s *RoleService) List(page, pageSize int, keyword string) ([]model.Role, in
 		return nil, 0, err
 	}
 
-	// 分页查询，预加载权限和菜单
+	// 分页查询，预加载菜单
 	offset := (page - 1) * pageSize
-	if err := query.Preload("Permissions").Preload("Menus").Offset(offset).Limit(pageSize).Find(&roles).Error; err != nil {
+	if err := query.Preload("Menus").Offset(offset).Limit(pageSize).Find(&roles).Error; err != nil {
 		return nil, 0, err
 	}
 
 	return roles, total, nil
 }
 
-// AssignPermissions 分配权限
-func (s *RoleService) AssignPermissions(roleID uint, permissionIDs []uint) error {
-	var role model.Role
-	if err := migrations.GetDB().Where("id = ?", roleID).First(&role).Error; err != nil {
-		return err
-	}
+// AssignPolicies 分配 API 权限（使用 Casbin）
+func (s *RoleService) AssignPolicies(roleID uint, apiDefIDs []uint) error {
+	policyService := NewPolicyService()
+	return policyService.UpdateRolePolicies(roleID, apiDefIDs)
+}
 
-	var permissions []model.Permission
-	if err := migrations.GetDB().Where("id IN ?", permissionIDs).Find(&permissions).Error; err != nil {
-		return err
-	}
-
-	return migrations.GetDB().Model(&role).Association("Permissions").Replace(permissions)
+// GetPolicies 获取角色的 API 权限 ID 列表
+func (s *RoleService) GetPolicies(roleID uint) ([]uint, error) {
+	policyService := NewPolicyService()
+	return policyService.GetRoleAPIDefIDs(roleID)
 }
 
 // AssignMenus 分配菜单

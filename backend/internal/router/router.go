@@ -54,82 +54,91 @@ func SetupRouter() *gin.Engine {
 			// 用户管理
 			userHandler := handler.NewUserHandler()
 			user := auth.Group("/users")
+			user.Use(middleware.CasbinRBACMiddleware())
 			{
-				user.GET("", middleware.PermissionMiddleware("user", "read"), userHandler.List)
-				user.GET("/:id", middleware.PermissionMiddleware("user", "read"), userHandler.GetByID)
-				user.POST("", middleware.PermissionMiddleware("user", "create"), userHandler.Create)
-				user.PUT("/:id", middleware.PermissionMiddleware("user", "update"), userHandler.Update)
-				user.DELETE("/:id", middleware.PermissionMiddleware("user", "delete"), userHandler.Delete)
-				user.POST("/:id/roles", middleware.PermissionMiddleware("user", "update"), userHandler.AssignRoles)
+				user.GET("", userHandler.List)
+				user.GET("/:id", userHandler.GetByID)
+				user.POST("", userHandler.Create)
+				user.PUT("/:id", userHandler.Update)
+				user.DELETE("/:id", userHandler.Delete)
+				user.POST("/:id/roles", userHandler.AssignRoles)
 			}
 
 			// 角色管理
 			roleHandler := handler.NewRoleHandler()
 			role := auth.Group("/roles")
+			role.Use(middleware.CasbinRBACMiddleware())
 			{
-				role.GET("", middleware.PermissionMiddleware("role", "read"), roleHandler.List)
-				role.GET("/:id", middleware.PermissionMiddleware("role", "read"), roleHandler.GetByID)
-				role.POST("", middleware.PermissionMiddleware("role", "create"), roleHandler.Create)
-				role.PUT("/:id", middleware.PermissionMiddleware("role", "update"), roleHandler.Update)
-				role.DELETE("/:id", middleware.PermissionMiddleware("role", "delete"), roleHandler.Delete)
-				role.POST("/:id/permissions", middleware.PermissionMiddleware("role", "update"), roleHandler.AssignPermissions)
-				role.POST("/:id/menus", middleware.PermissionMiddleware("role", "update"), roleHandler.AssignMenus)
+				role.GET("", roleHandler.List)
+				role.GET("/:id", roleHandler.GetByID)
+				role.POST("", roleHandler.Create)
+				role.PUT("/:id", roleHandler.Update)
+				role.DELETE("/:id", roleHandler.Delete)
+				role.GET("/:id/policies", roleHandler.GetPolicies)
+				role.POST("/:id/policies", roleHandler.AssignPolicies)
+				role.POST("/:id/menus", roleHandler.AssignMenus)
 			}
 
-			// 权限管理
-			permissionHandler := handler.NewPermissionHandler()
-			permission := auth.Group("/permissions")
+			// API 定义管理
+			apiDefHandler := handler.NewAPIDefinitionHandler()
+			apiDef := auth.Group("/api-definitions")
+			apiDef.Use(middleware.CasbinRBACMiddleware())
 			{
-				permission.GET("", middleware.PermissionMiddleware("permission", "read"), permissionHandler.List)
-				permission.GET("/resources", middleware.PermissionMiddleware("permission", "read"), permissionHandler.GetResources)
-				permission.GET("/:id", middleware.PermissionMiddleware("permission", "read"), permissionHandler.GetByID)
-				permission.POST("", middleware.PermissionMiddleware("permission", "create"), permissionHandler.Create)
-				permission.PUT("/:id", middleware.PermissionMiddleware("permission", "update"), permissionHandler.Update)
-				permission.DELETE("/:id", middleware.PermissionMiddleware("permission", "delete"), permissionHandler.Delete)
+				apiDef.GET("", apiDefHandler.List)
+				apiDef.GET("/resources", apiDefHandler.GetResources)
+				apiDef.GET("/all", apiDefHandler.GetAll)
+				apiDef.GET("/:id", apiDefHandler.GetByID)
+				apiDef.POST("", apiDefHandler.Create)
+				apiDef.PUT("/:id", apiDefHandler.Update)
+				apiDef.DELETE("/:id", apiDefHandler.Delete)
 			}
 
 			// 菜单管理
 			menuHandler := handler.NewMenuHandler()
 			menu := auth.Group("/menus")
+			menu.Use(middleware.CasbinRBACMiddleware())
 			{
-				menu.GET("", middleware.PermissionMiddleware("menu", "read"), menuHandler.List)
-				menu.GET("/:id", middleware.PermissionMiddleware("menu", "read"), menuHandler.GetByID)
-				menu.POST("", middleware.PermissionMiddleware("menu", "create"), menuHandler.Create)
-				menu.PUT("/:id", middleware.PermissionMiddleware("menu", "update"), menuHandler.Update)
-				menu.DELETE("/:id", middleware.PermissionMiddleware("menu", "delete"), menuHandler.Delete)
+				menu.GET("", menuHandler.List)
+				menu.GET("/:id", menuHandler.GetByID)
+				menu.POST("", menuHandler.Create)
+				menu.PUT("/:id", menuHandler.Update)
+				menu.DELETE("/:id", menuHandler.Delete)
 			}
 
 			// 网站分类管理
 			navigationCategoryHandler := handler.NewNavigationCategoryHandler()
 			navigationCategory := auth.Group("/navigation-categories")
+			navigationCategory.Use(middleware.CasbinRBACMiddleware())
 			{
-				navigationCategory.GET("", middleware.PermissionMiddleware("navigation_category", "read"), navigationCategoryHandler.List)
-				navigationCategory.GET("/:id", middleware.PermissionMiddleware("navigation_category", "read"), navigationCategoryHandler.GetByID)
-				navigationCategory.POST("", middleware.PermissionMiddleware("navigation_category", "create"), navigationCategoryHandler.Create)
-				navigationCategory.PUT("/:id", middleware.PermissionMiddleware("navigation_category", "update"), navigationCategoryHandler.Update)
-				navigationCategory.DELETE("/:id", middleware.PermissionMiddleware("navigation_category", "delete"), navigationCategoryHandler.Delete)
+				navigationCategory.GET("", navigationCategoryHandler.List)
+				navigationCategory.GET("/:id", navigationCategoryHandler.GetByID)
+				navigationCategory.POST("", navigationCategoryHandler.Create)
+				navigationCategory.PUT("/:id", navigationCategoryHandler.Update)
+				navigationCategory.DELETE("/:id", navigationCategoryHandler.Delete)
 			}
 
 			// 网站管理
 			navigationHandler := handler.NewNavigationHandler()
 			navigation := auth.Group("/navigations")
+			navigation.Use(middleware.CasbinRBACMiddleware())
 			{
-				navigation.GET("", middleware.PermissionMiddleware("navigation", "read"), navigationHandler.List)
-				navigation.GET("/:id", middleware.PermissionMiddleware("navigation", "read"), navigationHandler.GetByID)
-				navigation.POST("", middleware.PermissionMiddleware("navigation", "create"), navigationHandler.Create)
-				navigation.PUT("/:id", middleware.PermissionMiddleware("navigation", "update"), navigationHandler.Update)
-				navigation.DELETE("/:id", middleware.PermissionMiddleware("navigation", "delete"), navigationHandler.Delete)
+				navigation.GET("", navigationHandler.List)
+				navigation.GET("/:id", navigationHandler.GetByID)
+				navigation.POST("", navigationHandler.Create)
+				navigation.PUT("/:id", navigationHandler.Update)
+				navigation.DELETE("/:id", navigationHandler.Delete)
 			}
 
 			// 系统配置管理
 			systemConfigHandler := handler.NewSystemConfigHandler()
 			systemConfig := auth.Group("/system-config")
+			systemConfig.Use(middleware.CasbinRBACMiddleware())
 			{
-				systemConfig.GET("/oidc", middleware.PermissionMiddleware("system", "read"), systemConfigHandler.GetOIDCConfig)
-				systemConfig.PUT("/oidc", middleware.PermissionMiddleware("system", "update"), systemConfigHandler.UpdateOIDCConfig)
-				systemConfig.GET("/email", middleware.PermissionMiddleware("system", "read"), systemConfigHandler.GetEmailConfig)
-				systemConfig.PUT("/email", middleware.PermissionMiddleware("system", "update"), systemConfigHandler.UpdateEmailConfig)
-				systemConfig.POST("/email/test", middleware.PermissionMiddleware("system", "read"), systemConfigHandler.TestEmail)
+				systemConfig.GET("/oidc", systemConfigHandler.GetOIDCConfig)
+				systemConfig.PUT("/oidc", systemConfigHandler.UpdateOIDCConfig)
+				systemConfig.GET("/email", systemConfigHandler.GetEmailConfig)
+				systemConfig.PUT("/email", systemConfigHandler.UpdateEmailConfig)
+				systemConfig.POST("/email/test", systemConfigHandler.TestEmail)
 			}
 
 		}
@@ -154,52 +163,53 @@ func SetupRouter() *gin.Engine {
 func setupSSOAdminRoutes(r *gin.Engine) {
 	ssoAdmin := r.Group("/api/v1/sso")
 	ssoAdmin.Use(middleware.AuthMiddleware())
+	ssoAdmin.Use(middleware.CasbinRBACMiddleware())
 	{
 		// 租户管理
 		tenantHandler := ssoHandler.NewTenantHandler()
 		tenants := ssoAdmin.Group("/tenants")
 		{
-			tenants.GET("", middleware.PermissionMiddleware("sso_tenant", "read"), tenantHandler.List)
-			tenants.GET("/:id", middleware.PermissionMiddleware("sso_tenant", "read"), tenantHandler.GetByID)
-			tenants.POST("", middleware.PermissionMiddleware("sso_tenant", "create"), tenantHandler.Create)
-			tenants.PUT("/:id", middleware.PermissionMiddleware("sso_tenant", "update"), tenantHandler.Update)
-			tenants.DELETE("/:id", middleware.PermissionMiddleware("sso_tenant", "delete"), tenantHandler.Delete)
+			tenants.GET("", tenantHandler.List)
+			tenants.GET("/:id", tenantHandler.GetByID)
+			tenants.POST("", tenantHandler.Create)
+			tenants.PUT("/:id", tenantHandler.Update)
+			tenants.DELETE("/:id", tenantHandler.Delete)
 		}
 
 		// SSO 用户管理
 		userHandler := ssoHandler.NewUserHandler()
 		users := ssoAdmin.Group("/users")
 		{
-			users.GET("", middleware.PermissionMiddleware("sso_user", "read"), userHandler.List)
-			users.GET("/:id", middleware.PermissionMiddleware("sso_user", "read"), userHandler.GetByID)
-			users.POST("", middleware.PermissionMiddleware("sso_user", "create"), userHandler.Create)
-			users.PUT("/:id", middleware.PermissionMiddleware("sso_user", "update"), userHandler.Update)
-			users.DELETE("/:id", middleware.PermissionMiddleware("sso_user", "delete"), userHandler.Delete)
-			users.POST("/:id/reset-password", middleware.PermissionMiddleware("sso_user", "update"), userHandler.ResetPassword)
-			users.POST("/:id/groups", middleware.PermissionMiddleware("sso_user", "update"), userHandler.AssignGroups)
+			users.GET("", userHandler.List)
+			users.GET("/:id", userHandler.GetByID)
+			users.POST("", userHandler.Create)
+			users.PUT("/:id", userHandler.Update)
+			users.DELETE("/:id", userHandler.Delete)
+			users.POST("/:id/reset-password", userHandler.ResetPassword)
+			users.POST("/:id/groups", userHandler.AssignGroups)
 		}
 
 		// 用户组管理
 		groupHandler := ssoHandler.NewGroupHandler()
 		groups := ssoAdmin.Group("/groups")
 		{
-			groups.GET("", middleware.PermissionMiddleware("sso_group", "read"), groupHandler.List)
-			groups.GET("/active", middleware.PermissionMiddleware("sso_group", "read"), groupHandler.ListActive)
-			groups.GET("/:id", middleware.PermissionMiddleware("sso_group", "read"), groupHandler.GetByID)
-			groups.POST("", middleware.PermissionMiddleware("sso_group", "create"), groupHandler.Create)
-			groups.PUT("/:id", middleware.PermissionMiddleware("sso_group", "update"), groupHandler.Update)
-			groups.DELETE("/:id", middleware.PermissionMiddleware("sso_group", "delete"), groupHandler.Delete)
+			groups.GET("", groupHandler.List)
+			groups.GET("/active", groupHandler.ListActive)
+			groups.GET("/:id", groupHandler.GetByID)
+			groups.POST("", groupHandler.Create)
+			groups.PUT("/:id", groupHandler.Update)
+			groups.DELETE("/:id", groupHandler.Delete)
 		}
 
 		// OIDC 客户端管理
 		clientHandler := ssoHandler.NewOIDCClientHandler()
 		clients := ssoAdmin.Group("/clients")
 		{
-			clients.GET("", middleware.PermissionMiddleware("sso_client", "read"), clientHandler.List)
-			clients.GET("/:id", middleware.PermissionMiddleware("sso_client", "read"), clientHandler.GetByID)
-			clients.POST("", middleware.PermissionMiddleware("sso_client", "create"), clientHandler.Create)
-			clients.PUT("/:id", middleware.PermissionMiddleware("sso_client", "update"), clientHandler.Update)
-			clients.DELETE("/:id", middleware.PermissionMiddleware("sso_client", "delete"), clientHandler.Delete)
+			clients.GET("", clientHandler.List)
+			clients.GET("/:id", clientHandler.GetByID)
+			clients.POST("", clientHandler.Create)
+			clients.PUT("/:id", clientHandler.Update)
+			clients.DELETE("/:id", clientHandler.Delete)
 		}
 	}
 }

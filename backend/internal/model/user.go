@@ -2,13 +2,13 @@ package model
 
 // User 用户模型
 type User struct {
-	BaseModelWithSoftDelete
-	Username string `gorm:"type:varchar(50);uniqueIndex;not null" json:"username"`
+	BaseModel
+	Username string `gorm:"type:varchar(50);not null;index:idx_user_username" json:"username"`
 	Password string `gorm:"type:varchar(255);not null" json:"-"`
-	Email    string `gorm:"type:varchar(100);uniqueIndex" json:"email"`
+	Email    string `gorm:"type:varchar(100);index:idx_user_email" json:"email"`
 	Avatar   string `gorm:"type:varchar(255)" json:"avatar"`
 	Phone    string `gorm:"type:varchar(20)" json:"phone"`
-	Status   int    `gorm:"type:tinyint;default:1;comment:状态 1-启用 0-禁用" json:"status"`
+	Status   int    `gorm:"type:tinyint;default:1;index:idx_user_status;comment:状态 1-启用 0-禁用" json:"status"`
 	Roles    []Role `gorm:"many2many:user_roles;" json:"roles,omitempty"`
 }
 

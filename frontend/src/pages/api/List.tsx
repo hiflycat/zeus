@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Plus, Search } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
-import { getPermissionList, createPermission, updatePermission, deletePermission, getPermissionResources, Permission, PermissionListParams } from '@/api/permission'
+import { getAPIDefinitionList, createAPIDefinition, updateAPIDefinition, deleteAPIDefinition, getAPIResources, APIDefinition, APIDefinitionListParams } from '@/api/api-definition'
 import { usePagination } from '@/hooks/usePagination'
 import {
   Button,
@@ -32,17 +32,17 @@ import {
   Pagination,
 } from '@/components/ui-tw'
 
-const PermissionList = () => {
+const APIList = () => {
   const { t } = useTranslation()
   const [resources, setResources] = useState<string[]>([])
   const [filterResource, setFilterResource] = useState<string>('')
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingPermission, setEditingPermission] = useState<Permission | null>(null)
-  const [formData, setFormData] = useState({ name: '', api: '', method: 'GET', resource: '', description: '' })
-  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Permission>()
+  const [editingAPI, setEditingAPI] = useState<APIDefinition | null>(null)
+  const [formData, setFormData] = useState({ name: '', path: '', method: 'GET', resource: '', description: '' })
+  const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<APIDefinition>()
 
   const {
-    data: permissions,
+    data: apiDefinitions,
     loading,
     total,
     page,
@@ -53,22 +53,19 @@ const PermissionList = () => {
     handleSearchSubmit,
     handleParamsChange,
     refresh,
-  } = usePagination<Permission>({
+  } = usePagination<APIDefinition>({
     fetchFn: async (params) => {
-      const permissionsRes = await getPermissionList(params as PermissionListParams)
-      return permissionsRes
+      const res = await getAPIDefinitionList(params as APIDefinitionListParams)
+      return res
     },
     defaultPageSize: 10,
     defaultParams: { resource: '' },
   })
 
-  // 获取资源类型列表（只需要加载一次）
   useEffect(() => {
-    getPermissionResources()
+    getAPIResources()
       .then(res => setResources(res || []))
-      .catch(() => {
-        // 错误提示已在响应拦截器中根据错误码显示
-      })
+      .catch(() => {})
   }, [])
 
   const handleResourceFilterChange = (value: string) => {
@@ -78,27 +75,27 @@ const PermissionList = () => {
   }
 
   const handleCreate = () => {
-    setEditingPermission(null)
-    setFormData({ name: '', api: '', method: 'GET', resource: '', description: '' })
+    setEditingAPI(null)
+    setFormData({ name: '', path: '', method: 'GET', resource: '', description: '' })
     setDialogOpen(true)
   }
 
-  const handleEdit = (permission: Permission) => {
-    setEditingPermission(permission)
+  const handleEdit = (api: APIDefinition) => {
+    setEditingAPI(api)
     setFormData({
-      name: permission.name,
-      api: permission.api || '',
-      method: permission.method || 'GET',
-      resource: permission.resource || '',
-      description: permission.description || '',
+      name: api.name,
+      path: api.path || '',
+      method: api.method || 'GET',
+      resource: api.resource || '',
+      description: api.description || '',
     })
     setDialogOpen(true)
   }
 
-  const handleDeleteConfirm = async (permission: Permission) => {
+  const handleDeleteConfirm = async (api: APIDefinition) => {
     try {
-      await deletePermission(permission.id!)
-      toast.success(t('permission.deleteSuccess'))
+      await deleteAPIDefinition(api.id!)
+      toast.success(t('api.deleteSuccess'))
       resetDeleting()
       refresh()
     } catch (error: any) {
@@ -107,23 +104,21 @@ const PermissionList = () => {
   }
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.api.trim() || !formData.method.trim()) {
-      toast.error(t('permission.nameRequired'))
+    if (!formData.name.trim() || !formData.path.trim() || !formData.method.trim()) {
+      toast.error(t('api.nameRequired'))
       return
     }
     try {
-      if (editingPermission) {
-        await updatePermission(editingPermission.id!, formData)
-        toast.success(t('permission.updateSuccess'))
+      if (editingAPI) {
+        await updateAPIDefinition(editingAPI.id!, formData)
+        toast.success(t('api.updateSuccess'))
       } else {
-        await createPermission(formData)
-        toast.success(t('permission.createSuccess'))
+        await createAPIDefinition(formData)
+        toast.success(t('api.createSuccess'))
       }
       setDialogOpen(false)
       refresh()
-    } catch (error: any) {
-      // 错误提示已在响应拦截器中根据错误码显示
-    }
+    } catch (error: any) {}
   }
 
   return (
@@ -134,7 +129,7 @@ const PermissionList = () => {
           <div className="relative max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={t('permission.searchPlaceholder')}
+              placeholder={t('api.searchPlaceholder')}
               value={searchKeyword}
               onChange={(e) => handleSearch(e.target.value)}
               onKeyDown={(e) => {
@@ -147,10 +142,10 @@ const PermissionList = () => {
           </div>
           <Select value={filterResource || '__all__'} onValueChange={handleResourceFilterChange}>
             <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder={t('permission.filterResource')} />
+              <SelectValue placeholder={t('api.filterResource')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">{t('permission.all')}</SelectItem>
+              <SelectItem value="__all__">{t('api.all')}</SelectItem>
               {resources.map((resource) => (
                 <SelectItem key={resource} value={resource}>{resource}</SelectItem>
               ))}
@@ -159,7 +154,7 @@ const PermissionList = () => {
         </div>
         <Button onClick={handleCreate}>
           <Plus className="h-4 w-4 mr-2" />
-          {t('permission.createPermission')}
+          {t('api.createAPI')}
         </Button>
       </div>
 
@@ -169,10 +164,10 @@ const PermissionList = () => {
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">ID</TableHead>
-              <TableHead>{t('permission.name')}</TableHead>
-              <TableHead>{t('permission.method')}</TableHead>
-              <TableHead>{t('permission.api')}</TableHead>
-              <TableHead>{t('permission.resource')}</TableHead>
+              <TableHead>{t('api.name')}</TableHead>
+              <TableHead>{t('api.method')}</TableHead>
+              <TableHead>{t('api.path')}</TableHead>
+              <TableHead>{t('api.resource')}</TableHead>
               <TableHead>{t('common.description')}</TableHead>
               <TableHead className="w-32">{t('common.operation')}</TableHead>
             </TableRow>
@@ -180,43 +175,43 @@ const PermissionList = () => {
           <TableBody>
             {loading ? (
               <TableEmpty colSpan={7} loading />
-            ) : permissions.length === 0 ? (
+            ) : apiDefinitions.length === 0 ? (
               <TableEmpty colSpan={7} />
             ) : (
-              permissions.map((permission) => (
-                <TableRow key={permission.id}>
-                  <TableCell className="font-medium">{permission.id}</TableCell>
-                  <TableCell>{permission.name}</TableCell>
+              apiDefinitions.map((api) => (
+                <TableRow key={api.id}>
+                  <TableCell className="font-medium">{api.id}</TableCell>
+                  <TableCell>{api.name}</TableCell>
                   <TableCell>
                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
-                      permission.method === 'GET' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-                      permission.method === 'POST' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-                      permission.method === 'PUT' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' :
-                      permission.method === 'DELETE' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
+                      api.method === 'GET' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+                      api.method === 'POST' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
+                      api.method === 'PUT' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' :
+                      api.method === 'DELETE' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
                       'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300'
-                    }`}>{permission.method}</span>
+                    }`}>{api.method}</span>
                   </TableCell>
                   <TableCell>
-                    <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{permission.api}</code>
+                    <code className="text-xs bg-muted px-1.5 py-0.5 rounded">{api.path}</code>
                   </TableCell>
-                  <TableCell>{permission.resource || '-'}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-xs truncate">{permission.description || '-'}</TableCell>
+                  <TableCell>{api.resource || '-'}</TableCell>
+                  <TableCell className="text-muted-foreground max-w-xs truncate">{api.description || '-'}</TableCell>
                   <TableCell>
                     <div className="relative">
                       <TableActions>
-                        <TableActionButton variant="edit" onClick={() => handleEdit(permission)} />
+                        <TableActionButton variant="edit" onClick={() => handleEdit(api)} />
                         <TableActionButton
                           variant="delete"
-                          ref={(el) => setButtonRef(permission.id!, el)}
-                          onClick={() => handleDeleteClick(permission)}
+                          ref={(el) => setButtonRef(api.id!, el)}
+                          onClick={() => handleDeleteClick(api)}
                         />
                       </TableActions>
                       <DeleteConfirmCard
-                        isOpen={deletingId === permission.id}
-                        message={t('permission.deleteConfirm', { name: permission.name })}
-                        onConfirm={() => handleDeleteConfirm(permission)}
+                        isOpen={deletingId === api.id}
+                        message={t('api.deleteConfirm', { name: api.name })}
+                        onConfirm={() => handleDeleteConfirm(api)}
                         onCancel={handleDeleteCancel}
-                        buttonRef={getButtonRef(permission.id!)}
+                        buttonRef={getButtonRef(api.id!)}
                       />
                     </div>
                   </TableCell>
@@ -237,25 +232,25 @@ const PermissionList = () => {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingPermission ? t('permission.editPermission') : t('permission.createPermission')}</DialogTitle>
+            <DialogTitle>{editingAPI ? t('api.editAPI') : t('api.createAPI')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>{t('permission.name')} *</Label>
+              <Label>{t('api.name')} *</Label>
               <Input
                 value={formData.name}
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder={t('permission.namePlaceholder')}
+                placeholder={t('api.namePlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('permission.method')} *</Label>
+              <Label>{t('api.method')} *</Label>
               <Select
                 value={formData.method}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, method: value }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={t('permission.selectMethod')} />
+                  <SelectValue placeholder={t('api.selectMethod')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="GET">GET</SelectItem>
@@ -267,24 +262,24 @@ const PermissionList = () => {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>{t('permission.api')} *</Label>
+              <Label>{t('api.path')} *</Label>
               <Input
-                value={formData.api}
-                onChange={(e) => setFormData(prev => ({ ...prev, api: e.target.value }))}
-                placeholder={t('permission.apiPlaceholder')}
+                value={formData.path}
+                onChange={(e) => setFormData(prev => ({ ...prev, path: e.target.value }))}
+                placeholder={t('api.pathPlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label>{t('permission.resource')}</Label>
+              <Label>{t('api.resource')}</Label>
               <Select
                 value={formData.resource || '__none__'}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, resource: value === '__none__' ? '' : value }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={t('permission.filterResource')} />
+                  <SelectValue placeholder={t('api.filterResource')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">{t('permission.none')}</SelectItem>
+                  <SelectItem value="__none__">{t('api.none')}</SelectItem>
                   {resources.map((resource) => (
                     <SelectItem key={resource} value={resource}>{resource}</SelectItem>
                   ))}
@@ -296,7 +291,7 @@ const PermissionList = () => {
               <Input
                 value={formData.description}
                 onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder={t('permission.descriptionPlaceholder')}
+                placeholder={t('api.descriptionPlaceholder')}
               />
             </div>
           </div>
@@ -310,4 +305,4 @@ const PermissionList = () => {
   )
 }
 
-export default PermissionList
+export default APIList

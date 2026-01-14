@@ -202,7 +202,7 @@ func (s *GroupService) Update(group *sso.Group) error {
 func (s *GroupService) Delete(id uint) error {
 	return migrations.GetDB().Transaction(func(tx *gorm.DB) error {
 		// 先清除关联
-		if err := tx.Model(&sso.Group{BaseModelWithSoftDelete: sso.BaseModelWithSoftDelete{BaseModel: sso.BaseModel{ID: id}}}).Association("Users").Clear(); err != nil {
+		if err := tx.Model(&sso.Group{BaseModel: sso.BaseModel{ID: id}}).Association("Users").Clear(); err != nil {
 			return err
 		}
 		return tx.Delete(&sso.Group{}, id).Error

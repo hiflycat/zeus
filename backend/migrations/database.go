@@ -85,7 +85,7 @@ func Migrate() error {
 	if err := db.AutoMigrate(
 		&model.User{},
 		&model.Role{},
-		&model.Permission{},
+		&model.APIDefinition{},
 		&model.Menu{},
 		&model.SystemConfig{},
 		&model.NavigationCategory{},

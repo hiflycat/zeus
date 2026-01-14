@@ -1,6 +1,7 @@
 package main
 
 import (
+	casbinPkg "backend/internal/casbin"
 	"backend/internal/config"
 	"backend/internal/ldap"
 	"backend/internal/router"
@@ -60,11 +61,25 @@ func main() {
 	logger.Info("Database seeded successfully")
 
 	// 同步权限数据 - 每次启动都执行，检查并添加新权限
-	if err := migrations.SyncPermissions(); err != nil {
-		logger.Error("Failed to sync permissions", zap.Error(err))
+	if err := migrations.SyncAPIDefinitions(); err != nil {
+		logger.Error("Failed to sync API definitions", zap.Error(err))
 		os.Exit(1)
 	}
-	logger.Info("Permissions synced successfully")
+	logger.Info("API definitions synced successfully")
+
+	// 初始化 Casbin
+	if err := casbinPkg.Init(migrations.GetDB()); err != nil {
+		logger.Error("Failed to init Casbin", zap.Error(err))
+		os.Exit(1)
+	}
+	logger.Info("Casbin initialized successfully")
+
+	// 同步 Casbin 策略
+	if err := migrations.SyncCasbinPolicies(); err != nil {
+		logger.Error("Failed to sync Casbin policies", zap.Error(err))
+		os.Exit(1)
+	}
+	logger.Info("Casbin policies synced successfully")
 
 	// 同步系统配置 - 每次启动都执行，检查并添加默认配置
 	if err := migrations.SyncSystemConfigs(); err != nil {

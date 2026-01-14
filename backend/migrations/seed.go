@@ -1,6 +1,9 @@
 package migrations
 
 import (
+	"strconv"
+
+	casbinPkg "backend/internal/casbin"
 	"backend/internal/model"
 	"backend/pkg/utils"
 )
@@ -58,7 +61,7 @@ func Seed() error {
 		{Name: "导航管理", Path: "/system/navigation", Icon: "AppstoreOutlined", Component: "system/navigation", Sort: 1, Status: 1},
 		{Name: "用户管理", Path: "/system/user", Icon: "UserOutlined", Component: "system/user", Sort: 2, Status: 1},
 		{Name: "角色管理", Path: "/system/role", Icon: "TeamOutlined", Component: "system/role", Sort: 3, Status: 1},
-		{Name: "权限管理", Path: "/system/permission", Icon: "SafetyOutlined", Component: "system/permission", Sort: 4, Status: 1},
+		{Name: "API 管理", Path: "/system/api", Icon: "ApiOutlined", Component: "system/api", Sort: 4, Status: 1},
 		{Name: "菜单管理", Path: "/system/menu", Icon: "MenuOutlined", Component: "system/menu", Sort: 5, Status: 1},
 		{Name: "系统设置", Path: "/system/settings", Icon: "SettingOutlined", Component: "system/settings", Sort: 6, Status: 1},
 	}
@@ -132,103 +135,120 @@ func Seed() error {
 	return nil
 }
 
-// SyncPermissions 同步权限数据（每次启动都执行，检查并添加新权限）
-func SyncPermissions() error {
-	// 定义所有权限
-	permissions := []model.Permission{
+// SyncAPIDefinitions 同步 API 定义数据（每次启动都执行）
+func SyncAPIDefinitions() error {
+	apiDefs := []model.APIDefinition{
 		// 用户管理
-		{Name: "用户列表", API: "/api/v1/users", Method: "GET", Resource: "user", Description: "查看用户列表"},
-		{Name: "用户详情", API: "/api/v1/users/:id", Method: "GET", Resource: "user", Description: "查看用户详情"},
-		{Name: "用户创建", API: "/api/v1/users", Method: "POST", Resource: "user", Description: "创建用户"},
-		{Name: "用户更新", API: "/api/v1/users/:id", Method: "PUT", Resource: "user", Description: "更新用户信息"},
-		{Name: "用户删除", API: "/api/v1/users/:id", Method: "DELETE", Resource: "user", Description: "删除用户"},
-		{Name: "用户分配角色", API: "/api/v1/users/:id/roles", Method: "POST", Resource: "user", Description: "分配用户角色"},
+		{Name: "用户列表", Path: "/api/v1/users", Method: "GET", Resource: "user", Description: "查看用户列表"},
+		{Name: "用户详情", Path: "/api/v1/users/:id", Method: "GET", Resource: "user", Description: "查看用户详情"},
+		{Name: "用户创建", Path: "/api/v1/users", Method: "POST", Resource: "user", Description: "创建用户"},
+		{Name: "用户更新", Path: "/api/v1/users/:id", Method: "PUT", Resource: "user", Description: "更新用户信息"},
+		{Name: "用户删除", Path: "/api/v1/users/:id", Method: "DELETE", Resource: "user", Description: "删除用户"},
+		{Name: "用户分配角色", Path: "/api/v1/users/:id/roles", Method: "POST", Resource: "user", Description: "分配用户角色"},
 		// 角色管理
-		{Name: "角色列表", API: "/api/v1/roles", Method: "GET", Resource: "role", Description: "查看角色列表"},
-		{Name: "角色详情", API: "/api/v1/roles/:id", Method: "GET", Resource: "role", Description: "查看角色详情"},
-		{Name: "角色创建", API: "/api/v1/roles", Method: "POST", Resource: "role", Description: "创建角色"},
-		{Name: "角色更新", API: "/api/v1/roles/:id", Method: "PUT", Resource: "role", Description: "更新角色信息"},
-		{Name: "角色删除", API: "/api/v1/roles/:id", Method: "DELETE", Resource: "role", Description: "删除角色"},
-		{Name: "角色分配权限", API: "/api/v1/roles/:id/permissions", Method: "POST", Resource: "role", Description: "分配角色权限"},
-		{Name: "角色分配菜单", API: "/api/v1/roles/:id/menus", Method: "POST", Resource: "role", Description: "分配角色菜单"},
-		// 权限管理
-		{Name: "权限列表", API: "/api/v1/permissions", Method: "GET", Resource: "permission", Description: "查看权限列表"},
-		{Name: "权限资源列表", API: "/api/v1/permissions/resources", Method: "GET", Resource: "permission", Description: "获取权限资源类型"},
-		{Name: "权限详情", API: "/api/v1/permissions/:id", Method: "GET", Resource: "permission", Description: "查看权限详情"},
-		{Name: "权限创建", API: "/api/v1/permissions", Method: "POST", Resource: "permission", Description: "创建权限"},
-		{Name: "权限更新", API: "/api/v1/permissions/:id", Method: "PUT", Resource: "permission", Description: "更新权限信息"},
-		{Name: "权限删除", API: "/api/v1/permissions/:id", Method: "DELETE", Resource: "permission", Description: "删除权限"},
+		{Name: "角色列表", Path: "/api/v1/roles", Method: "GET", Resource: "role", Description: "查看角色列表"},
+		{Name: "角色详情", Path: "/api/v1/roles/:id", Method: "GET", Resource: "role", Description: "查看角色详情"},
+		{Name: "角色创建", Path: "/api/v1/roles", Method: "POST", Resource: "role", Description: "创建角色"},
+		{Name: "角色更新", Path: "/api/v1/roles/:id", Method: "PUT", Resource: "role", Description: "更新角色信息"},
+		{Name: "角色删除", Path: "/api/v1/roles/:id", Method: "DELETE", Resource: "role", Description: "删除角色"},
+		{Name: "角色分配菜单", Path: "/api/v1/roles/:id/menus", Method: "POST", Resource: "role", Description: "分配角色菜单"},
+		{Name: "角色获取策略", Path: "/api/v1/roles/:id/policies", Method: "GET", Resource: "role", Description: "获取角色策略"},
+		{Name: "角色分配API", Path: "/api/v1/roles/:id/policies", Method: "POST", Resource: "role", Description: "分配角色API权限"},
+		// API 管理
+		{Name: "API列表", Path: "/api/v1/api-definitions", Method: "GET", Resource: "api", Description: "查看API列表"},
+		{Name: "API资源列表", Path: "/api/v1/api-definitions/resources", Method: "GET", Resource: "api", Description: "获取API资源类型"},
+		{Name: "API全部列表", Path: "/api/v1/api-definitions/all", Method: "GET", Resource: "api", Description: "获取所有API定义"},
+		{Name: "API详情", Path: "/api/v1/api-definitions/:id", Method: "GET", Resource: "api", Description: "查看API详情"},
+		{Name: "API创建", Path: "/api/v1/api-definitions", Method: "POST", Resource: "api", Description: "创建API"},
+		{Name: "API更新", Path: "/api/v1/api-definitions/:id", Method: "PUT", Resource: "api", Description: "更新API信息"},
+		{Name: "API删除", Path: "/api/v1/api-definitions/:id", Method: "DELETE", Resource: "api", Description: "删除API"},
 		// 菜单管理
-		{Name: "菜单列表", API: "/api/v1/menus", Method: "GET", Resource: "menu", Description: "查看菜单列表"},
-		{Name: "菜单详情", API: "/api/v1/menus/:id", Method: "GET", Resource: "menu", Description: "查看菜单详情"},
-		{Name: "菜单创建", API: "/api/v1/menus", Method: "POST", Resource: "menu", Description: "创建菜单"},
-		{Name: "菜单更新", API: "/api/v1/menus/:id", Method: "PUT", Resource: "menu", Description: "更新菜单信息"},
-		{Name: "菜单删除", API: "/api/v1/menus/:id", Method: "DELETE", Resource: "menu", Description: "删除菜单"},
+		{Name: "菜单列表", Path: "/api/v1/menus", Method: "GET", Resource: "menu", Description: "查看菜单列表"},
+		{Name: "菜单详情", Path: "/api/v1/menus/:id", Method: "GET", Resource: "menu", Description: "查看菜单详情"},
+		{Name: "菜单创建", Path: "/api/v1/menus", Method: "POST", Resource: "menu", Description: "创建菜单"},
+		{Name: "菜单更新", Path: "/api/v1/menus/:id", Method: "PUT", Resource: "menu", Description: "更新菜单信息"},
+		{Name: "菜单删除", Path: "/api/v1/menus/:id", Method: "DELETE", Resource: "menu", Description: "删除菜单"},
 		// 系统设置
-		{Name: "OIDC配置查看", API: "/api/v1/system-config/oidc", Method: "GET", Resource: "system", Description: "查看OIDC配置"},
-		{Name: "OIDC配置更新", API: "/api/v1/system-config/oidc", Method: "PUT", Resource: "system", Description: "更新OIDC配置"},
-		{Name: "邮件配置查看", API: "/api/v1/system-config/email", Method: "GET", Resource: "system", Description: "查看邮件配置"},
-		{Name: "邮件配置更新", API: "/api/v1/system-config/email", Method: "PUT", Resource: "system", Description: "更新邮件配置"},
-		{Name: "邮件测试", API: "/api/v1/system-config/email/test", Method: "POST", Resource: "system", Description: "测试邮件发送"},
+		{Name: "OIDC配置查看", Path: "/api/v1/system-config/oidc", Method: "GET", Resource: "system", Description: "查看OIDC配置"},
+		{Name: "OIDC配置更新", Path: "/api/v1/system-config/oidc", Method: "PUT", Resource: "system", Description: "更新OIDC配置"},
+		{Name: "邮件配置查看", Path: "/api/v1/system-config/email", Method: "GET", Resource: "system", Description: "查看邮件配置"},
+		{Name: "邮件配置更新", Path: "/api/v1/system-config/email", Method: "PUT", Resource: "system", Description: "更新邮件配置"},
+		{Name: "邮件测试", Path: "/api/v1/system-config/email/test", Method: "POST", Resource: "system", Description: "测试邮件发送"},
 		// 网站管理
-		{Name: "网站分类列表", API: "/api/v1/navigation-categories", Method: "GET", Resource: "navigation", Description: "查看网站分类列表"},
-		{Name: "网站分类详情", API: "/api/v1/navigation-categories/:id", Method: "GET", Resource: "navigation", Description: "查看网站分类详情"},
-		{Name: "网站分类创建", API: "/api/v1/navigation-categories", Method: "POST", Resource: "navigation", Description: "创建网站分类"},
-		{Name: "网站分类更新", API: "/api/v1/navigation-categories/:id", Method: "PUT", Resource: "navigation", Description: "更新网站分类信息"},
-		{Name: "网站分类删除", API: "/api/v1/navigation-categories/:id", Method: "DELETE", Resource: "navigation", Description: "删除网站分类"},
-		{Name: "网站列表", API: "/api/v1/navigations", Method: "GET", Resource: "navigation", Description: "查看网站列表"},
-		{Name: "网站详情", API: "/api/v1/navigations/:id", Method: "GET", Resource: "navigation", Description: "查看网站详情"},
-		{Name: "网站创建", API: "/api/v1/navigations", Method: "POST", Resource: "navigation", Description: "创建网站"},
-		{Name: "网站更新", API: "/api/v1/navigations/:id", Method: "PUT", Resource: "navigation", Description: "更新网站信息"},
-		{Name: "网站删除", API: "/api/v1/navigations/:id", Method: "DELETE", Resource: "navigation", Description: "删除网站"},
+		{Name: "网站分类列表", Path: "/api/v1/navigation-categories", Method: "GET", Resource: "navigation", Description: "查看网站分类列表"},
+		{Name: "网站分类详情", Path: "/api/v1/navigation-categories/:id", Method: "GET", Resource: "navigation", Description: "查看网站分类详情"},
+		{Name: "网站分类创建", Path: "/api/v1/navigation-categories", Method: "POST", Resource: "navigation", Description: "创建网站分类"},
+		{Name: "网站分类更新", Path: "/api/v1/navigation-categories/:id", Method: "PUT", Resource: "navigation", Description: "更新网站分类信息"},
+		{Name: "网站分类删除", Path: "/api/v1/navigation-categories/:id", Method: "DELETE", Resource: "navigation", Description: "删除网站分类"},
+		{Name: "网站列表", Path: "/api/v1/navigations", Method: "GET", Resource: "navigation", Description: "查看网站列表"},
+		{Name: "网站详情", Path: "/api/v1/navigations/:id", Method: "GET", Resource: "navigation", Description: "查看网站详情"},
+		{Name: "网站创建", Path: "/api/v1/navigations", Method: "POST", Resource: "navigation", Description: "创建网站"},
+		{Name: "网站更新", Path: "/api/v1/navigations/:id", Method: "PUT", Resource: "navigation", Description: "更新网站信息"},
+		{Name: "网站删除", Path: "/api/v1/navigations/:id", Method: "DELETE", Resource: "navigation", Description: "删除网站"},
 		// SSO 租户管理
-		{Name: "SSO租户列表", API: "/api/v1/sso/tenants", Method: "GET", Resource: "sso_tenant", Description: "查看SSO租户列表"},
-		{Name: "SSO租户详情", API: "/api/v1/sso/tenants/:id", Method: "GET", Resource: "sso_tenant", Description: "查看SSO租户详情"},
-		{Name: "SSO租户创建", API: "/api/v1/sso/tenants", Method: "POST", Resource: "sso_tenant", Description: "创建SSO租户"},
-		{Name: "SSO租户更新", API: "/api/v1/sso/tenants/:id", Method: "PUT", Resource: "sso_tenant", Description: "更新SSO租户"},
-		{Name: "SSO租户删除", API: "/api/v1/sso/tenants/:id", Method: "DELETE", Resource: "sso_tenant", Description: "删除SSO租户"},
+		{Name: "SSO租户列表", Path: "/api/v1/sso/tenants", Method: "GET", Resource: "sso_tenant", Description: "查看SSO租户列表"},
+		{Name: "SSO租户详情", Path: "/api/v1/sso/tenants/:id", Method: "GET", Resource: "sso_tenant", Description: "查看SSO租户详情"},
+		{Name: "SSO租户创建", Path: "/api/v1/sso/tenants", Method: "POST", Resource: "sso_tenant", Description: "创建SSO租户"},
+		{Name: "SSO租户更新", Path: "/api/v1/sso/tenants/:id", Method: "PUT", Resource: "sso_tenant", Description: "更新SSO租户"},
+		{Name: "SSO租户删除", Path: "/api/v1/sso/tenants/:id", Method: "DELETE", Resource: "sso_tenant", Description: "删除SSO租户"},
 		// SSO 用户管理
-		{Name: "SSO用户列表", API: "/api/v1/sso/users", Method: "GET", Resource: "sso_user", Description: "查看SSO用户列表"},
-		{Name: "SSO用户详情", API: "/api/v1/sso/users/:id", Method: "GET", Resource: "sso_user", Description: "查看SSO用户详情"},
-		{Name: "SSO用户创建", API: "/api/v1/sso/users", Method: "POST", Resource: "sso_user", Description: "创建SSO用户"},
-		{Name: "SSO用户更新", API: "/api/v1/sso/users/:id", Method: "PUT", Resource: "sso_user", Description: "更新SSO用户"},
-		{Name: "SSO用户删除", API: "/api/v1/sso/users/:id", Method: "DELETE", Resource: "sso_user", Description: "删除SSO用户"},
-		{Name: "SSO用户重置密码", API: "/api/v1/sso/users/:id/reset-password", Method: "POST", Resource: "sso_user", Description: "重置SSO用户密码"},
-		{Name: "SSO用户分配组", API: "/api/v1/sso/users/:id/groups", Method: "POST", Resource: "sso_user", Description: "分配SSO用户组"},
+		{Name: "SSO用户列表", Path: "/api/v1/sso/users", Method: "GET", Resource: "sso_user", Description: "查看SSO用户列表"},
+		{Name: "SSO用户详情", Path: "/api/v1/sso/users/:id", Method: "GET", Resource: "sso_user", Description: "查看SSO用户详情"},
+		{Name: "SSO用户创建", Path: "/api/v1/sso/users", Method: "POST", Resource: "sso_user", Description: "创建SSO用户"},
+		{Name: "SSO用户更新", Path: "/api/v1/sso/users/:id", Method: "PUT", Resource: "sso_user", Description: "更新SSO用户"},
+		{Name: "SSO用户删除", Path: "/api/v1/sso/users/:id", Method: "DELETE", Resource: "sso_user", Description: "删除SSO用户"},
+		{Name: "SSO用户重置密码", Path: "/api/v1/sso/users/:id/reset-password", Method: "POST", Resource: "sso_user", Description: "重置SSO用户密码"},
+		{Name: "SSO用户分配组", Path: "/api/v1/sso/users/:id/groups", Method: "POST", Resource: "sso_user", Description: "分配SSO用户组"},
 		// SSO 用户组管理
-		{Name: "SSO用户组列表", API: "/api/v1/sso/groups", Method: "GET", Resource: "sso_group", Description: "查看SSO用户组列表"},
-		{Name: "SSO用户组详情", API: "/api/v1/sso/groups/:id", Method: "GET", Resource: "sso_group", Description: "查看SSO用户组详情"},
-		{Name: "SSO用户组创建", API: "/api/v1/sso/groups", Method: "POST", Resource: "sso_group", Description: "创建SSO用户组"},
-		{Name: "SSO用户组更新", API: "/api/v1/sso/groups/:id", Method: "PUT", Resource: "sso_group", Description: "更新SSO用户组"},
-		{Name: "SSO用户组删除", API: "/api/v1/sso/groups/:id", Method: "DELETE", Resource: "sso_group", Description: "删除SSO用户组"},
+		{Name: "SSO用户组列表", Path: "/api/v1/sso/groups", Method: "GET", Resource: "sso_group", Description: "查看SSO用户组列表"},
+		{Name: "SSO活跃用户组", Path: "/api/v1/sso/groups/active", Method: "GET", Resource: "sso_group", Description: "查看活跃SSO用户组"},
+		{Name: "SSO用户组详情", Path: "/api/v1/sso/groups/:id", Method: "GET", Resource: "sso_group", Description: "查看SSO用户组详情"},
+		{Name: "SSO用户组创建", Path: "/api/v1/sso/groups", Method: "POST", Resource: "sso_group", Description: "创建SSO用户组"},
+		{Name: "SSO用户组更新", Path: "/api/v1/sso/groups/:id", Method: "PUT", Resource: "sso_group", Description: "更新SSO用户组"},
+		{Name: "SSO用户组删除", Path: "/api/v1/sso/groups/:id", Method: "DELETE", Resource: "sso_group", Description: "删除SSO用户组"},
 		// SSO OIDC 客户端管理
-		{Name: "OIDC客户端列表", API: "/api/v1/sso/clients", Method: "GET", Resource: "sso_client", Description: "查看OIDC客户端列表"},
-		{Name: "OIDC客户端详情", API: "/api/v1/sso/clients/:id", Method: "GET", Resource: "sso_client", Description: "查看OIDC客户端详情"},
-		{Name: "OIDC客户端创建", API: "/api/v1/sso/clients", Method: "POST", Resource: "sso_client", Description: "创建OIDC客户端"},
-		{Name: "OIDC客户端更新", API: "/api/v1/sso/clients/:id", Method: "PUT", Resource: "sso_client", Description: "更新OIDC客户端"},
-		{Name: "OIDC客户端删除", API: "/api/v1/sso/clients/:id", Method: "DELETE", Resource: "sso_client", Description: "删除OIDC客户端"},
+		{Name: "OIDC客户端列表", Path: "/api/v1/sso/clients", Method: "GET", Resource: "sso_client", Description: "查看OIDC客户端列表"},
+		{Name: "OIDC客户端详情", Path: "/api/v1/sso/clients/:id", Method: "GET", Resource: "sso_client", Description: "查看OIDC客户端详情"},
+		{Name: "OIDC客户端创建", Path: "/api/v1/sso/clients", Method: "POST", Resource: "sso_client", Description: "创建OIDC客户端"},
+		{Name: "OIDC客户端更新", Path: "/api/v1/sso/clients/:id", Method: "PUT", Resource: "sso_client", Description: "更新OIDC客户端"},
+		{Name: "OIDC客户端删除", Path: "/api/v1/sso/clients/:id", Method: "DELETE", Resource: "sso_client", Description: "删除OIDC客户端"},
 	}
 
-	// 同步权限（如果不存在则创建）
-	for _, permission := range permissions {
-		if err := db.FirstOrCreate(&permission, model.Permission{API: permission.API, Method: permission.Method}).Error; err != nil {
+	for _, apiDef := range apiDefs {
+		if err := db.FirstOrCreate(&apiDef, model.APIDefinition{Path: apiDef.Path, Method: apiDef.Method}).Error; err != nil {
 			return err
 		}
 	}
 
-	// 将所有权限分配给超级管理员角色
-	var superAdminRole model.Role
-	if err := db.Where("name = ?", "admin").First(&superAdminRole).Error; err != nil {
-		// 超级管理员角色不存在，跳过
+	return nil
+}
+
+// SyncCasbinPolicies 同步 Casbin 策略（为 admin 角色分配所有 API 权限）
+func SyncCasbinPolicies() error {
+	enforcer := casbinPkg.GetEnforcer()
+	if enforcer == nil {
 		return nil
 	}
 
-	var allPermissions []model.Permission
-	if err := db.Find(&allPermissions).Error; err != nil {
+	var superAdminRole model.Role
+	if err := db.Where("name = ?", "admin").First(&superAdminRole).Error; err != nil {
+		return nil
+	}
+
+	// 获取所有 API 定义
+	var apiDefs []model.APIDefinition
+	if err := db.Find(&apiDefs).Error; err != nil {
 		return err
 	}
 
-	return db.Model(&superAdminRole).Association("Permissions").Replace(allPermissions)
+	roleIDStr := strconv.FormatUint(uint64(superAdminRole.ID), 10)
+
+	// 为 admin 角色添加所有 API 权限（使用角色 ID）
+	for _, apiDef := range apiDefs {
+		enforcer.AddPolicy(roleIDStr, apiDef.Path, apiDef.Method)
+	}
+
+	return enforcer.SavePolicy()
 }
 
 // SyncSystemConfigs 同步系统配置（每次启动都执行，检查并添加默认配置）

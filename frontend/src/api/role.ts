@@ -5,7 +5,6 @@ export interface Role {
   name: string
   description?: string
   status: number
-  permissions?: any[]
   menus?: any[]
 }
 
@@ -47,9 +46,14 @@ export const deleteRole = (id: number): Promise<void> => {
   return request.delete(`/roles/${id}`)
 }
 
-// 分配权限
-export const assignPermissions = (id: number, permissionIds: number[]): Promise<void> => {
-  return request.post(`/roles/${id}/permissions`, { permission_ids: permissionIds })
+// 获取角色的 API 权限 ID 列表
+export const getRolePolicies = (id: number): Promise<number[]> => {
+  return request.get(`/roles/${id}/policies`)
+}
+
+// 分配 API 权限
+export const assignPolicies = (id: number, apiDefIds: number[]): Promise<void> => {
+  return request.post(`/roles/${id}/policies`, { api_def_ids: apiDefIds })
 }
 
 // 分配菜单

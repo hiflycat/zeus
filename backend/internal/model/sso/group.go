@@ -2,7 +2,7 @@ package sso
 
 // Group SSO 用户组模型
 type Group struct {
-	BaseModelWithSoftDelete
+	BaseModel
 	TenantID    uint   `gorm:"index;not null;comment:租户ID" json:"tenant_id"`
 	Name        string `gorm:"type:varchar(100);not null;comment:组名称" json:"name"`
 	Description string `gorm:"type:varchar(255);comment:组描述" json:"description"`

@@ -16,7 +16,7 @@ const OIDCCallback = lazy(() => import('@/pages/oidc-callback'))
 const Dashboard = lazy(() => import('@/pages/dashboard'))
 const UserList = lazy(() => import('@/pages/user/List'))
 const RoleList = lazy(() => import('@/pages/role/List'))
-const PermissionList = lazy(() => import('@/pages/permission/List'))
+const APIList = lazy(() => import('@/pages/api/List'))
 const MenuList = lazy(() => import('@/pages/menu/List'))
 const NavigationPage = lazy(() => import('@/pages/navigation'))
 const SystemSettings = lazy(() => import('@/pages/system/settings'))
@@ -64,7 +64,7 @@ export const AppRouter = () => {
           <Route path="system">
             <Route path="user" element={<UserList />} />
             <Route path="role" element={<RoleList />} />
-            <Route path="permission" element={<PermissionList />} />
+            <Route path="api" element={<APIList />} />
             <Route path="menu" element={<MenuList />} />
             <Route path="navigation" element={<NavigationPage />} />
             <Route path="settings" element={<SystemSettings />} />
