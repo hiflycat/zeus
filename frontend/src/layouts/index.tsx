@@ -248,23 +248,30 @@ const Layout = () => {
         <button
           onClick={() => handleMenuClick(menu)}
           className={cn(
-            "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-            level > 0 && "ml-4",
+            "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 cursor-pointer",
+            level > 0 && "ml-3",
             isActive
-              ? "bg-primary text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
+              : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
         >
-          <div className="flex items-center gap-3">
-            {IconComponent && <IconComponent className="h-5 w-5" />}
+          <div className="flex items-center gap-2">
+            {IconComponent && (
+              <div className={cn(
+                "flex h-6 w-6 items-center justify-center rounded-md transition-colors",
+                isActive ? "bg-primary-foreground/20" : "bg-sidebar-accent"
+              )}>
+                <IconComponent className="h-3.5 w-3.5" />
+              </div>
+            )}
             <span>{getMenuTranslation(menu.name, t)}</span>
           </div>
           {hasChildren && (
-            <ChevronRight className={cn("h-4 w-4 transition-transform", isExpanded && "rotate-90")} />
+            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", isExpanded && "rotate-90")} />
           )}
         </button>
         {hasChildren && isExpanded && (
-          <div className="mt-1 space-y-1">
+          <div className="mt-1 space-y-0.5">
             {[...menu.children].sort((a: any, b: any) => (a.sort || 0) - (b.sort || 0)).map((child: any) => renderMenuItem(child, level + 1))}
           </div>
         )}
@@ -277,55 +284,61 @@ const Layout = () => {
   }, [menus])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
       {/* Mobile sidebar overlay */}
       {mobileSidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden"
           onClick={() => setMobileSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar border-r border-sidebar-border transition-transform duration-300 ease-in-out",
+        "fixed inset-y-0 left-0 z-50 w-52 transition-transform duration-300 ease-out",
+        "bg-sidebar/80 backdrop-blur-xl border-r border-sidebar-border/50",
         "md:translate-x-0",
         mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
         !sidebarOpen && "md:-translate-x-full"
       )}>
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="relative flex h-14 items-center justify-center px-4 border-b border-sidebar-border">
-            <span className="font-semibold text-sidebar-foreground truncate">{serverName}</span>
-            <Button variant="ghost" size="icon" className="absolute right-4 md:hidden" onClick={() => setMobileSidebarOpen(false)}>
-              <X className="h-5 w-5" />
+          <div className="relative flex h-12 items-center justify-center px-3 border-b border-sidebar-border/50">
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <Home className="h-4 w-4" />
+              </div>
+              <span className="font-semibold text-sm text-sidebar-foreground truncate">{serverName}</span>
+            </div>
+            <Button variant="ghost" size="icon" className="absolute right-2 md:hidden hover:bg-sidebar-accent h-7 w-7" onClick={() => setMobileSidebarOpen(false)}>
+              <X className="h-4 w-4" />
             </Button>
           </div>
 
           {/* Menu */}
-          <ScrollArea className="flex-1 px-3 py-4">
+          <ScrollArea className="flex-1 px-2 py-3">
             <nav className="space-y-1">
               {sortedMenus.map(menu => renderMenuItem(menu))}
             </nav>
           </ScrollArea>
 
           {/* User */}
-          <div className="border-t border-sidebar-border p-3">
+          <div className="border-t border-sidebar-border/50 p-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-sidebar-accent transition-colors">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
+                <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-sidebar-accent/80 transition-all duration-200 cursor-pointer group">
+                  <Avatar className="h-7 w-7 ring-2 ring-primary/20 group-hover:ring-primary/40 transition-all">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left min-w-0">
-                    <div className="text-sm font-medium text-sidebar-foreground truncate">{user?.username || '用户'}</div>
+                    <div className="text-xs font-medium text-sidebar-foreground truncate">{user?.username || '用户'}</div>
                     {user?.roles && user.roles.length > 0 && currentRoleId && (
-                      <div className="text-xs text-muted-foreground truncate">
+                      <div className="text-[10px] text-muted-foreground truncate">
                         {user.roles.find((r: any) => r.id === currentRoleId)?.name || '未选择角色'}
                       </div>
                     )}
                   </div>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side="top" className="w-56">
@@ -375,111 +388,61 @@ const Layout = () => {
 
       {/* Main content */}
       <div className={cn(
-        "min-h-screen transition-all duration-300",
-        sidebarOpen ? "md:ml-64" : "md:ml-0"
+        "min-h-screen transition-all duration-300 ease-out",
+        sidebarOpen ? "md:ml-52" : "md:ml-0"
       )}>
         {/* Header */}
-        <header className="sticky top-0 z-30 flex h-[4.5rem] items-center gap-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4">
-          <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileSidebarOpen(true)}>
-            <Menu className="h-6 w-6" />
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 backdrop-blur-xl px-4">
+          <Button variant="ghost" size="icon" className="md:hidden hover:bg-accent" onClick={() => setMobileSidebarOpen(true)}>
+            <Menu className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="hidden md:flex" onClick={() => setSidebarOpen(!sidebarOpen)}>
-            <Menu className="h-6 w-6" />
+          <Button variant="ghost" size="icon" className="hidden md:flex hover:bg-accent" onClick={() => setSidebarOpen(!sidebarOpen)}>
+            <Menu className="h-5 w-5" />
           </Button>
 
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Home className="h-5 w-5" />
-            <span>/</span>
+          <div className="flex items-center gap-2 text-sm">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Home className="h-4 w-4" />
+            </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
             <span className="text-foreground font-medium">
-              {tabs.find(t => t.key === activeKey)?.title || t('menu.dashboard')}
+              {getTabTitle(activeKey || '/dashboard')}
             </span>
           </div>
 
           <div className="flex-1" />
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <LanguageSwitcher />
-            <Button variant="ghost" size="icon" onClick={toggleTheme}>
-              {theme === 'dark' ? <Sun className="h-6 w-6" /> : <Moon className="h-6 w-6" />}
+            <Button variant="ghost" size="icon" onClick={toggleTheme} className="hover:bg-accent">
+              {theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="flex items-center gap-2">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
-                  </Avatar>
-                  <span className="hidden sm:inline">{user?.username || '用户'}</span>
-                  <ChevronDown className="h-5 w-5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {user?.roles && user.roles.length > 0 && (
-                  <>
-                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                      当前角色
-                    </div>
-                    <DropdownMenuRadioGroup value={currentRoleId?.toString() || ''} onValueChange={(value) => {
-                      // 标记正在切换角色
-                      isSwitchingRoleRef.current = true
-                      // 切换角色前关闭所有标签并导航到首页
-                      clearTabs()
-                      navigate('/dashboard', { replace: true })
-                      setCurrentRole(parseInt(value)).catch(console.error)
-                    }}>
-                      {user.roles.map((role: any) => (
-                        <DropdownMenuRadioItem key={role.id} value={role.id.toString()}>
-                          <div className="flex items-center justify-between w-full">
-                            <span>{role.name}</span>
-                            {currentRoleId === role.id ? (
-                              <Badge variant="secondary" className="text-xs ml-2">{t('menu.current')}</Badge>
-                            ) : (
-                              <span className="text-xs text-muted-foreground ml-2">{t('menu.switch')}</span>
-                            )}
-                          </div>
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
-                  <Lock className="mr-2 h-4 w-4" />
-                  {t('auth.changePassword')}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  {t('auth.logout')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </header>
 
         {/* Tabs */}
         {tabs.length > 0 && (
-          <div className="flex items-center gap-1 px-4 py-2 border-b bg-muted/30 overflow-x-auto scrollbar-thin">
+          <div className="flex items-center gap-1.5 px-4 py-2.5 border-b border-border/50 bg-muted/20 overflow-x-auto scrollbar-thin">
             {tabs.map(tab => (
               <div
                 key={tab.key}
                 onClick={() => handleTabChange(tab.key)}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-colors whitespace-nowrap cursor-pointer",
+                  "flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap cursor-pointer",
                   activeKey === tab.key
-                    ? "bg-background text-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
+                    ? "bg-background text-foreground shadow-sm ring-1 ring-border/50"
+                    : "text-muted-foreground hover:bg-background/60 hover:text-foreground"
                 )}
               >
                 <span>{getTabTitle(tab.path)}</span>
                 {tab.closable && (
-                  <span 
-                    className="inline-flex items-center justify-center rounded hover:bg-muted p-0.5"
+                  <span
+                    className="inline-flex items-center justify-center rounded-md hover:bg-muted p-0.5 transition-colors"
                     onClick={(e) => handleTabClose(tab.key, e)}
                   >
-                    <X className="h-3.5 w-3.5 hover:text-destructive" />
+                    <X className="h-3.5 w-3.5 hover:text-destructive transition-colors" />
                   </span>
                 )}
               </div>

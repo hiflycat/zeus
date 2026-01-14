@@ -98,11 +98,7 @@ const CategoryManagement = () => {
   const {
     data: categories,
     loading,
-    total,
-    page,
-    pageSize,
     searchKeyword,
-    handlePageChange,
     handleSearch,
     handleSearchSubmit,
     refresh,
@@ -116,10 +112,10 @@ const CategoryManagement = () => {
         list: Array.isArray(categoriesRes) ? categoriesRes : [],
         total: Array.isArray(categoriesRes) ? categoriesRes.length : 0,
         page: params.page || 1,
-        page_size: params.page_size || 10,
+        page_size: params.page_size || 1000,
       }
     },
-    defaultPageSize: 10,
+    defaultPageSize: 1000,
   })
 
   const buildCategoryTree = (categoryList: NavigationCategory[], parentId: number = 0): any[] => {
@@ -399,12 +395,6 @@ const CategoryManagement = () => {
             )}
           </TableBody>
         </Table>
-        <Pagination
-          current={page}
-          total={total}
-          pageSize={pageSize}
-          onChange={handlePageChange}
-        />
       </div>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
