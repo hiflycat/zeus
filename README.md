@@ -221,14 +221,14 @@ make clean
 ### 角色管理
 - ✅ 角色列表（分页、搜索）
 - ✅ 角色创建/编辑/删除
-- ✅ 角色权限分配
+- ✅ 角色策略分配（基于 Casbin RBAC）
 - ✅ 角色菜单分配
 
-### 权限管理
-- ✅ 权限列表（分页、搜索、按资源筛选）
-- ✅ 权限创建/编辑/删除
+### API 定义管理
+- ✅ API 定义列表（分页、搜索、按资源筛选）
+- ✅ API 定义创建/编辑/删除
 - ✅ API 路径 + HTTP 方法模式（如：/api/v1/users + POST）
-- ✅ 权限自动同步（启动时检查并添加新权限）
+- ✅ API 定义自动同步（启动时检查并添加新定义）
 
 ### 菜单管理
 - ✅ 菜单树形列表（支持分页和树形两种模式）
@@ -267,6 +267,12 @@ make clean
 
 ## API 接口
 
+### 公开接口
+
+- `GET /health` - 健康检查
+- `GET /api/v1/server/info` - 获取服务器信息
+- `GET /api/v1/metrics` - 获取 Prometheus 格式的性能指标
+
 ### 认证接口
 
 - `POST /api/v1/auth/login` - 登录
@@ -292,17 +298,19 @@ make clean
 - `POST /api/v1/roles` - 创建角色
 - `PUT /api/v1/roles/:id` - 更新角色
 - `DELETE /api/v1/roles/:id` - 删除角色
-- `POST /api/v1/roles/:id/permissions` - 分配权限
+- `GET /api/v1/roles/:id/policies` - 获取角色策略
+- `POST /api/v1/roles/:id/policies` - 分配策略
 - `POST /api/v1/roles/:id/menus` - 分配菜单
 
-### 权限管理
+### API 定义管理
 
-- `GET /api/v1/permissions` - 获取权限列表
-- `GET /api/v1/permissions/resources` - 获取权限资源类型列表
-- `GET /api/v1/permissions/:id` - 获取权限详情
-- `POST /api/v1/permissions` - 创建权限
-- `PUT /api/v1/permissions/:id` - 更新权限
-- `DELETE /api/v1/permissions/:id` - 删除权限
+- `GET /api/v1/api-definitions` - 获取 API 定义列表
+- `GET /api/v1/api-definitions/resources` - 获取资源类型列表
+- `GET /api/v1/api-definitions/all` - 获取所有 API 定义
+- `GET /api/v1/api-definitions/:id` - 获取 API 定义详情
+- `POST /api/v1/api-definitions` - 创建 API 定义
+- `PUT /api/v1/api-definitions/:id` - 更新 API 定义
+- `DELETE /api/v1/api-definitions/:id` - 删除 API 定义
 
 ### 菜单管理
 
@@ -312,6 +320,22 @@ make clean
 - `PUT /api/v1/menus/:id` - 更新菜单
 - `DELETE /api/v1/menus/:id` - 删除菜单
 
+### 导航分类管理
+
+- `GET /api/v1/navigation-categories` - 获取分类列表
+- `GET /api/v1/navigation-categories/:id` - 获取分类详情
+- `POST /api/v1/navigation-categories` - 创建分类
+- `PUT /api/v1/navigation-categories/:id` - 更新分类
+- `DELETE /api/v1/navigation-categories/:id` - 删除分类
+
+### 导航网站管理
+
+- `GET /api/v1/navigations` - 获取网站列表
+- `GET /api/v1/navigations/:id` - 获取网站详情
+- `POST /api/v1/navigations` - 创建网站
+- `PUT /api/v1/navigations/:id` - 更新网站
+- `DELETE /api/v1/navigations/:id` - 删除网站
+
 ### 系统配置
 
 - `GET /api/v1/system-config/oidc` - 获取 OIDC 配置
@@ -320,9 +344,40 @@ make clean
 - `PUT /api/v1/system-config/email` - 更新邮件配置
 - `POST /api/v1/system-config/email/test` - 测试邮件发送
 
-### 性能监控
+### SSO 租户管理
 
-- `GET /api/v1/metrics` - 获取 Prometheus 格式的性能指标
+- `GET /api/v1/sso/tenants` - 获取租户列表
+- `GET /api/v1/sso/tenants/:id` - 获取租户详情
+- `POST /api/v1/sso/tenants` - 创建租户
+- `PUT /api/v1/sso/tenants/:id` - 更新租户
+- `DELETE /api/v1/sso/tenants/:id` - 删除租户
+
+### SSO 用户管理
+
+- `GET /api/v1/sso/users` - 获取 SSO 用户列表
+- `GET /api/v1/sso/users/:id` - 获取 SSO 用户详情
+- `POST /api/v1/sso/users` - 创建 SSO 用户
+- `PUT /api/v1/sso/users/:id` - 更新 SSO 用户
+- `DELETE /api/v1/sso/users/:id` - 删除 SSO 用户
+- `POST /api/v1/sso/users/:id/reset-password` - 重置密码
+- `POST /api/v1/sso/users/:id/groups` - 分配用户组
+
+### SSO 用户组管理
+
+- `GET /api/v1/sso/groups` - 获取用户组列表
+- `GET /api/v1/sso/groups/active` - 获取活跃用户组列表
+- `GET /api/v1/sso/groups/:id` - 获取用户组详情
+- `POST /api/v1/sso/groups` - 创建用户组
+- `PUT /api/v1/sso/groups/:id` - 更新用户组
+- `DELETE /api/v1/sso/groups/:id` - 删除用户组
+
+### SSO OIDC 客户端管理
+
+- `GET /api/v1/sso/clients` - 获取客户端列表
+- `GET /api/v1/sso/clients/:id` - 获取客户端详情
+- `POST /api/v1/sso/clients` - 创建客户端
+- `PUT /api/v1/sso/clients/:id` - 更新客户端
+- `DELETE /api/v1/sso/clients/:id` - 删除客户端
 
 ## 配置说明
 
