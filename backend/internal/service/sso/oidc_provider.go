@@ -2,9 +2,12 @@ package sso
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
+	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,7 +77,7 @@ func (s *OIDCProviderService) GetJWKS() *crypto.JWKS {
 	return crypto.GetJWKManager().GetJWKS()
 }
 
-// ValidateClient 验证客户端
+// ValidateClient 验证客户端（只验证域名）
 func (s *OIDCProviderService) ValidateClient(clientID, redirectURI string) (*sso.OIDCClient, error) {
 	var client sso.OIDCClient
 	if err := migrations.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
@@ -84,20 +87,20 @@ func (s *OIDCProviderService) ValidateClient(clientID, redirectURI string) (*sso
 		return nil, err
 	}
 
-	// 验证 redirect_uri
-	var redirectURIs []string
-	if err := json.Unmarshal([]byte(client.RedirectURIs), &redirectURIs); err != nil {
-		return nil, errors.New("invalid redirect_uris configuration")
+	// 解析请求的 redirect_uri
+	parsedURI, err := url.Parse(redirectURI)
+	if err != nil {
+		return nil, errors.New("invalid redirect_uri")
 	}
 
-	valid := false
-	for _, uri := range redirectURIs {
-		if uri == redirectURI {
-			valid = true
-			break
-		}
+	// 解析客户端的 RootURL（去除末尾的 /）
+	parsedRoot, err := url.Parse(strings.TrimSuffix(client.RootURL, "/"))
+	if err != nil {
+		return nil, errors.New("invalid client root_url configuration")
 	}
-	if !valid {
+
+	// 验证域名匹配
+	if parsedRoot.Scheme != parsedURI.Scheme || parsedRoot.Host != parsedURI.Host {
 		return nil, errors.New("invalid redirect_uri")
 	}
 
@@ -114,7 +117,8 @@ func (s *OIDCProviderService) ValidateClientCredentials(clientID, clientSecret s
 		return nil, err
 	}
 
-	if client.ClientSecret != clientSecret {
+	// 使用常量时间比较防止时序攻击
+	if subtle.ConstantTimeCompare([]byte(client.ClientSecret), []byte(clientSecret)) != 1 {
 		return nil, errors.New("invalid client credentials")
 	}
 
@@ -122,19 +126,21 @@ func (s *OIDCProviderService) ValidateClientCredentials(clientID, clientSecret s
 }
 
 // CreateAuthorizationCode 创建授权码
-func (s *OIDCProviderService) CreateAuthorizationCode(clientID string, userID uint, redirectURI, scopes, state, nonce string) (string, error) {
+func (s *OIDCProviderService) CreateAuthorizationCode(clientID string, userID uint, redirectURI, scopes, state, nonce, codeChallenge, codeChallengeMethod string) (string, error) {
 	code := generateRandomString(32)
 
 	authCode := &sso.AuthorizationCode{
-		Code:        code,
-		ClientID:    clientID,
-		UserID:      userID,
-		RedirectURI: redirectURI,
-		Scopes:      scopes,
-		State:       state,
-		Nonce:       nonce,
-		ExpiresAt:   time.Now().Add(10 * time.Minute),
-		Used:        false,
+		Code:                code,
+		ClientID:            clientID,
+		UserID:              userID,
+		RedirectURI:         redirectURI,
+		Scopes:              scopes,
+		State:               state,
+		Nonce:               nonce,
+		CodeChallenge:       codeChallenge,
+		CodeChallengeMethod: codeChallengeMethod,
+		ExpiresAt:           time.Now().Add(10 * time.Minute),
+		Used:                false,
 	}
 
 	if err := migrations.GetDB().Create(authCode).Error; err != nil {
@@ -145,7 +151,7 @@ func (s *OIDCProviderService) CreateAuthorizationCode(clientID string, userID ui
 }
 
 // ExchangeAuthorizationCode 交换授权码
-func (s *OIDCProviderService) ExchangeAuthorizationCode(code, clientID, clientSecret, redirectURI string) (*TokenResponse, error) {
+func (s *OIDCProviderService) ExchangeAuthorizationCode(code, clientID, clientSecret, redirectURI, codeVerifier string) (*TokenResponse, error) {
 	// 验证客户端凭据
 	client, err := s.ValidateClientCredentials(clientID, clientSecret)
 	if err != nil {
@@ -162,11 +168,25 @@ func (s *OIDCProviderService) ExchangeAuthorizationCode(code, clientID, clientSe
 	if authCode.ClientID != clientID {
 		return nil, errors.New("authorization code was not issued to this client")
 	}
-	if authCode.RedirectURI != redirectURI {
+	// 验证 redirect_uri 域名匹配
+	parsedStored, _ := url.Parse(authCode.RedirectURI)
+	parsedRequest, _ := url.Parse(redirectURI)
+	if parsedStored == nil || parsedRequest == nil ||
+		parsedStored.Scheme != parsedRequest.Scheme || parsedStored.Host != parsedRequest.Host {
 		return nil, errors.New("redirect_uri mismatch")
 	}
 	if time.Now().After(authCode.ExpiresAt) {
 		return nil, errors.New("authorization code expired")
+	}
+
+	// 验证 PKCE
+	if authCode.CodeChallenge != "" {
+		if codeVerifier == "" {
+			return nil, errors.New("code_verifier required")
+		}
+		if !verifyCodeChallenge(authCode.CodeChallenge, authCode.CodeChallengeMethod, codeVerifier) {
+			return nil, errors.New("invalid code_verifier")
+		}
 	}
 
 	// 标记授权码已使用
@@ -325,7 +345,7 @@ func (s *OIDCProviderService) generateIDToken(client *sso.OIDCClient, user *sso.
 	claims := IDTokenClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    s.issuer,
-			Subject:   string(rune(user.ID)),
+			Subject:   strconv.FormatUint(uint64(user.ID), 10),
 			Audience:  jwt.ClaimStrings{client.ClientID},
 			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(client.AccessTokenTTL) * time.Second)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -496,8 +516,8 @@ func (s *OIDCProviderService) ParseIDTokenHintWithUser(idTokenHint string) (clie
 			userID = uint(v)
 		case string:
 			// 尝试解析字符串形式的 user_id
-			if len(v) > 0 {
-				userID = uint(v[0])
+			if parsed, err := strconv.ParseUint(v, 10, 64); err == nil {
+				userID = uint(parsed)
 			}
 		}
 	}
@@ -505,30 +525,31 @@ func (s *OIDCProviderService) ParseIDTokenHintWithUser(idTokenHint string) (clie
 	return clientID, userID, nil
 }
 
-// ValidatePostLogoutRedirectURI 验证 post_logout_redirect_uri
+// ValidatePostLogoutRedirectURI 验证 post_logout_redirect_uri（使用 RootURL 验证域名）
 func (s *OIDCProviderService) ValidatePostLogoutRedirectURI(clientID, postLogoutRedirectURI string) error {
 	var client sso.OIDCClient
 	if err := migrations.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
 		return errors.New("invalid client_id")
 	}
 
-	// 如果客户端没有配置 post_logout_redirect_uris，则不允许重定向
-	if client.PostLogoutRedirectURIs == "" {
+	// 解析请求的 URI
+	parsedURI, err := url.Parse(postLogoutRedirectURI)
+	if err != nil {
+		return errors.New("invalid post_logout_redirect_uri")
+	}
+
+	// 解析客户端的 RootURL（去除末尾的 /）
+	parsedRoot, err := url.Parse(strings.TrimSuffix(client.RootURL, "/"))
+	if err != nil {
+		return errors.New("invalid client root_url configuration")
+	}
+
+	// 验证域名匹配
+	if parsedRoot.Scheme != parsedURI.Scheme || parsedRoot.Host != parsedURI.Host {
 		return errors.New("post_logout_redirect_uri not registered")
 	}
 
-	var uris []string
-	if err := json.Unmarshal([]byte(client.PostLogoutRedirectURIs), &uris); err != nil {
-		return errors.New("invalid post_logout_redirect_uris configuration")
-	}
-
-	for _, uri := range uris {
-		if uri == postLogoutRedirectURI {
-			return nil
-		}
-	}
-
-	return errors.New("post_logout_redirect_uri not registered")
+	return nil
 }
 
 // RevokeUserTokens 撤销用户的所有令牌
@@ -600,4 +621,19 @@ func generateRandomString(length int) string {
 	b := make([]byte, length)
 	rand.Read(b)
 	return base64.RawURLEncoding.EncodeToString(b)[:length]
+}
+
+// verifyCodeChallenge 验证 PKCE code_verifier
+func verifyCodeChallenge(codeChallenge, method, codeVerifier string) bool {
+	var computed string
+	switch method {
+	case "S256":
+		hash := sha256.Sum256([]byte(codeVerifier))
+		computed = base64.RawURLEncoding.EncodeToString(hash[:])
+	case "plain", "":
+		computed = codeVerifier
+	default:
+		return false
+	}
+	return subtle.ConstantTimeCompare([]byte(computed), []byte(codeChallenge)) == 1
 }

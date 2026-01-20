@@ -5,15 +5,17 @@ import "time"
 // AuthorizationCode 授权码模型
 type AuthorizationCode struct {
 	BaseModel
-	Code        string    `gorm:"type:varchar(255);uniqueIndex;not null;comment:授权码" json:"code"`
-	ClientID    string    `gorm:"type:varchar(100);index;not null;comment:客户端ID" json:"client_id"`
-	UserID      uint      `gorm:"index;not null;comment:用户ID" json:"user_id"`
-	RedirectURI string    `gorm:"type:varchar(255);not null;comment:回调地址" json:"redirect_uri"`
-	Scopes      string    `gorm:"type:varchar(255);comment:授权范围" json:"scopes"`
-	State       string    `gorm:"type:varchar(255);comment:状态参数" json:"state"`
-	Nonce       string    `gorm:"type:varchar(255);comment:Nonce参数" json:"nonce"`
-	ExpiresAt   time.Time `gorm:"not null;comment:过期时间" json:"expires_at"`
-	Used        bool      `gorm:"default:false;comment:是否已使用" json:"used"`
+	Code                string    `gorm:"type:varchar(255);uniqueIndex;not null;comment:授权码" json:"code"`
+	ClientID            string    `gorm:"type:varchar(100);index;not null;comment:客户端ID" json:"client_id"`
+	UserID              uint      `gorm:"index;not null;comment:用户ID" json:"user_id"`
+	RedirectURI         string    `gorm:"type:varchar(255);not null;comment:回调地址" json:"redirect_uri"`
+	Scopes              string    `gorm:"type:varchar(255);comment:授权范围" json:"scopes"`
+	State               string    `gorm:"type:varchar(255);comment:状态参数" json:"state"`
+	Nonce               string    `gorm:"type:varchar(255);comment:Nonce参数" json:"nonce"`
+	CodeChallenge       string    `gorm:"type:varchar(128);comment:PKCE code_challenge" json:"code_challenge"`
+	CodeChallengeMethod string    `gorm:"type:varchar(10);comment:PKCE方法(plain/S256)" json:"code_challenge_method"`
+	ExpiresAt           time.Time `gorm:"not null;comment:过期时间" json:"expires_at"`
+	Used                bool      `gorm:"default:false;comment:是否已使用" json:"used"`
 
 	// 关联
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`

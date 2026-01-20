@@ -1,14 +1,12 @@
 package sso
 
 import (
-	"crypto/rand"
 	"encoding/base64"
 	"net/url"
 	"strings"
 
 	"backend/internal/model/sso"
 	ssoService "backend/internal/service/sso"
-	"backend/migrations"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,23 +41,29 @@ func (h *OIDCProviderHandler) Authorize(c *gin.Context) {
 	scope := c.Query("scope")
 	state := c.Query("state")
 	nonce := c.Query("nonce")
+	codeChallenge := c.Query("code_challenge")
+	codeChallengeMethod := c.Query("code_challenge_method")
 
 	// 验证必需参数
 	if clientID == "" || redirectURI == "" || responseType == "" {
-		c.JSON(400, gin.H{"error": "invalid_request", "error_description": "missing required parameters"})
+		c.Redirect(302, "/sso/error?type=invalid_request&message="+url.QueryEscape("missing required parameters"))
 		return
 	}
 
 	// 目前只支持 authorization_code 流程
 	if responseType != "code" {
-		c.JSON(400, gin.H{"error": "unsupported_response_type"})
+		c.Redirect(302, "/sso/error?type=unsupported_response_type")
 		return
 	}
 
 	// 验证客户端
-	_, err := h.service.ValidateClient(clientID, redirectURI)
+	client, err := h.service.ValidateClient(clientID, redirectURI)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "invalid_client", "error_description": err.Error()})
+		errorType := "invalid_client"
+		if strings.Contains(err.Error(), "redirect_uri") {
+			errorType = "invalid_redirect_uri"
+		}
+		c.Redirect(302, "/sso/error?type="+errorType)
 		return
 	}
 
@@ -72,13 +76,30 @@ func (h *OIDCProviderHandler) Authorize(c *gin.Context) {
 		return
 	}
 
+	// 验证用户是否属于客户端的租户
+	user, err := ssoService.GetUserByID(userID.(uint))
+	if err != nil {
+		// 用户不存在，清除 session 让用户重新登录
+		c.SetCookie("sso_session", "", -1, "/", "", false, true)
+		loginURL := "/sso/login?redirect=" + url.QueryEscape(c.Request.URL.String())
+		c.Redirect(302, loginURL)
+		return
+	}
+	if err := ssoService.ValidateUserForClient(user, client); err != nil {
+		// 租户不匹配，清除 session 让用户重新登录
+		c.SetCookie("sso_session", "", -1, "/", "", false, true)
+		loginURL := "/sso/login?redirect=" + url.QueryEscape(c.Request.URL.String())
+		c.Redirect(302, loginURL)
+		return
+	}
+
 	// 检查用户是否已授权该应用
 	// TODO: 检查 user_consents 表
 
 	// 生成授权码
-	code, err := h.service.CreateAuthorizationCode(clientID, userID.(uint), redirectURI, scope, state, nonce)
+	code, err := h.service.CreateAuthorizationCode(clientID, userID.(uint), redirectURI, scope, state, nonce, codeChallenge, codeChallengeMethod)
 	if err != nil {
-		c.JSON(500, gin.H{"error": "server_error", "error_description": err.Error()})
+		c.Redirect(302, "/sso/error?type=server_error")
 		return
 	}
 
@@ -112,7 +133,8 @@ func (h *OIDCProviderHandler) Token(c *gin.Context) {
 	case "authorization_code":
 		code := c.PostForm("code")
 		redirectURI := c.PostForm("redirect_uri")
-		response, err = h.service.ExchangeAuthorizationCode(code, clientID, clientSecret, redirectURI)
+		codeVerifier := c.PostForm("code_verifier")
+		response, err = h.service.ExchangeAuthorizationCode(code, clientID, clientSecret, redirectURI, codeVerifier)
 
 	case "client_credentials":
 		scope := c.PostForm("scope")
@@ -128,7 +150,7 @@ func (h *OIDCProviderHandler) Token(c *gin.Context) {
 	}
 
 	if err != nil {
-		c.JSON(400, gin.H{"error": "invalid_grant", "error_description": err.Error()})
+		c.JSON(400, gin.H{"error": "invalid_grant"})
 		return
 	}
 
@@ -146,7 +168,7 @@ func (h *OIDCProviderHandler) UserInfo(c *gin.Context) {
 	accessToken := strings.TrimPrefix(authHeader, "Bearer ")
 	userInfo, err := h.service.GetUserInfo(accessToken)
 	if err != nil {
-		c.JSON(401, gin.H{"error": "invalid_token", "error_description": err.Error()})
+		c.JSON(401, gin.H{"error": "invalid_token"})
 		return
 	}
 
@@ -221,7 +243,7 @@ func (h *OIDCProviderHandler) Logout(c *gin.Context) {
 		if !validIDToken && clientID != "" {
 			// 没有有效的 id_token_hint，验证 redirect_uri 是否已注册
 			if err := h.service.ValidatePostLogoutRedirectURI(clientID, postLogoutRedirectURI); err != nil {
-				c.JSON(400, gin.H{"error": "invalid_request", "error_description": err.Error()})
+				c.JSON(400, gin.H{"error": "invalid_request"})
 				return
 			}
 		}
@@ -260,38 +282,59 @@ func (h *OIDCProviderHandler) Login(c *gin.Context) {
 	// 根据 tenant 名称查找 tenantID
 	var tenantID uint
 	if req.Tenant != "" {
-		var tenant sso.Tenant
-		if err := migrations.GetDB().Where("LOWER(name) = LOWER(?)", req.Tenant).First(&tenant).Error; err == nil {
-			tenantID = tenant.ID
+		tenant, err := ssoService.GetTenantByName(req.Tenant)
+		if err != nil {
+			c.JSON(401, gin.H{"code": 401, "message": "用户名或密码错误"})
+			return
 		}
+		tenantID = tenant.ID
 	}
 
-	user, err := h.service.AuthenticateUser(tenantID, req.Username, req.Password)
+	user, err := ssoService.AuthenticateUser(tenantID, req.Username, req.Password)
 	if err != nil {
-		c.JSON(401, gin.H{"code": 401, "message": err.Error()})
+		c.JSON(401, gin.H{"code": 401, "message": "用户名或密码错误"})
 		return
 	}
 
+	// 如果有 redirect URL，验证用户租户与客户端租户匹配
+	if req.Redirect != "" {
+		var client *sso.OIDCClient
+		var needClientValidation bool
+		parsedURL, _ := url.Parse(req.Redirect)
+		if parsedURL != nil {
+			// OIDC: 从 redirect URL 中提取 client_id
+			if clientID := parsedURL.Query().Get("client_id"); clientID != "" {
+				client, _ = ssoService.GetClientByID(clientID)
+				needClientValidation = true
+			}
+			// CAS: 从 /cas/login?service=xxx 中提取 service，再查找客户端
+			if client == nil && strings.HasPrefix(parsedURL.Path, "/cas/login") {
+				if service := parsedURL.Query().Get("service"); service != "" {
+					client, _ = ssoService.GetClientByRootURL(service)
+					needClientValidation = true
+				}
+			}
+		}
+		// 验证用户租户与客户端租户是否匹配
+		// 如果需要验证但找不到客户端，或者租户不匹配，都返回错误
+		if needClientValidation && (client == nil || user.TenantID != client.TenantID) {
+			c.JSON(401, gin.H{"code": 401, "message": "用户名或密码错误"})
+			return
+		}
+	}
+
 	// 设置 SSO session cookie
-	c.SetCookie("sso_session", generateSessionToken(user.ID), 86400, "/", "", false, true)
+	c.SetCookie("sso_session", ssoService.GenerateSessionToken(user.ID), 86400, "/", "", false, true)
 
 	c.JSON(200, gin.H{"code": 0, "message": "登录成功"})
-}
-
-// generateSessionToken 生成会话令牌
-func generateSessionToken(userID uint) string {
-	// 简单实现：userID + 随机字符串
-	b := make([]byte, 16)
-	rand.Read(b)
-	return base64.RawURLEncoding.EncodeToString(append([]byte{byte(userID >> 24), byte(userID >> 16), byte(userID >> 8), byte(userID)}, b...))
 }
 
 // getClientCredentials 获取客户端凭据
 func (h *OIDCProviderHandler) getClientCredentials(c *gin.Context) (clientID, clientSecret string, ok bool) {
 	// 尝试从 Authorization header 获取 (Basic Auth)
 	authHeader := c.GetHeader("Authorization")
-	if strings.HasPrefix(authHeader, "Basic ") {
-		decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(authHeader, "Basic "))
+	if basicAuth, found := strings.CutPrefix(authHeader, "Basic "); found {
+		decoded, err := base64.StdEncoding.DecodeString(basicAuth)
 		if err == nil {
 			parts := strings.SplitN(string(decoded), ":", 2)
 			if len(parts) == 2 {

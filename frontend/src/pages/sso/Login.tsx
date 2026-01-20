@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Eye, EyeOff, Lock, User, Building2 } from 'lucide-react'
+import { Eye, EyeOff, Lock, User } from 'lucide-react'
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription, Label } from '@/components/ui-tw'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 
@@ -15,22 +15,26 @@ const SSOLogin = ({ onLogin }: SSOLoginProps) => {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const [tenant, setTenant] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // 从 URL 获取 OIDC 参数
+  // 从 URL 获取参数
   const redirectUri = searchParams.get('redirect') || ''
+  const errorType = searchParams.get('error') || ''
 
   useEffect(() => {
     document.title = t('sso.login.title')
-  }, [t])
+    // 如果有错误参数，统一显示账号密码错误
+    if (errorType) {
+      toast.error(t('sso.login.failed'))
+    }
+  }, [t, errorType])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!tenant.trim() || !username.trim() || !password.trim()) {
+    if (!username.trim() || !password.trim()) {
       toast.error(t('sso.login.fillComplete'))
       return
     }
@@ -43,26 +47,26 @@ const SSOLogin = ({ onLogin }: SSOLoginProps) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          tenant,
           username,
           password,
-          redirect: redirectUri, // 传递完整的 redirect URL，后端会从中提取 client_id
+          redirect: redirectUri,
         }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.message || t('sso.login.failed'))
+        throw new Error(t('sso.login.failed'))
       }
 
       // 如果有回调地址，重定向回去
       if (data.redirect_url) {
         window.location.href = data.redirect_url
+      } else if (redirectUri) {
+        window.location.href = redirectUri
       } else if (onLogin) {
         onLogin(data.token)
       } else {
-        // 默认跳转到 SSO 用户中心
         navigate('/sso/account')
       }
 
@@ -112,22 +116,6 @@ const SSOLogin = ({ onLogin }: SSOLoginProps) => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="tenant">{t('sso.login.tenant')}</Label>
-                <div className="relative">
-                  <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="tenant"
-                    type="text"
-                    placeholder={t('sso.login.tenantPlaceholder')}
-                    value={tenant}
-                    onChange={(e) => setTenant(e.target.value)}
-                    className="pl-10"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="username">{t('sso.login.username')}</Label>
                 <div className="relative">

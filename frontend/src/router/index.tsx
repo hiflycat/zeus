@@ -24,6 +24,7 @@ const SystemSettings = lazy(() => import('@/pages/system/settings'))
 // SSO 页面
 const SSOLogin = lazy(() => import('@/pages/sso/Login'))
 const SSOAuthorize = lazy(() => import('@/pages/sso/Authorize'))
+const SSOError = lazy(() => import('@/pages/sso/Error'))
 const SSOAccount = lazy(() => import('@/pages/sso/Account'))
 const SSOTenantManage = lazy(() => import('@/pages/sso/TenantManage'))
 const SSOUserManage = lazy(() => import('@/pages/sso/UserManage'))
@@ -51,6 +52,7 @@ export const AppRouter = () => {
         {/* SSO 公开页面 */}
         <Route path="/sso/login" element={<SSOLogin />} />
         <Route path="/sso/authorize" element={<SSOAuthorize />} />
+        <Route path="/sso/error" element={<SSOError />} />
         <Route
           path="/"
           element={

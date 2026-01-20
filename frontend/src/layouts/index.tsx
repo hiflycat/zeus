@@ -1,15 +1,16 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
-import { 
-  Menu, 
-  X, 
-  ChevronDown, 
+import {
+  Menu,
+  X,
+  ChevronDown,
   ChevronRight,
   Home,
   Sun,
   Moon,
   LogOut,
-  Lock
+  Lock,
+  GripVertical
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslation } from 'react-i18next'
@@ -52,6 +53,11 @@ const Layout = () => {
   const { theme, toggleTheme } = useThemeStore()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem('sidebarWidth')
+    return saved ? parseInt(saved) : 208
+  })
+  const [isResizing, setIsResizing] = useState(false)
   const [serverName, setServerName] = useState<string>(t('auth.defaultSystemName'))
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ old_password: '', new_password: '', confirm_password: '' })
@@ -219,22 +225,57 @@ const Layout = () => {
 
   const handleChangePassword = async () => {
     if (passwordForm.new_password !== passwordForm.confirm_password) {
-      toast.error('两次输入的密码不一致')
+      toast.error(t('auth.passwordMismatch'))
       return
     }
     if (passwordForm.new_password.length < 6) {
-      toast.error('密码长度至少6位')
+      toast.error(t('auth.passwordTooShort'))
       return
     }
     try {
       await changePassword(passwordForm as ChangePasswordParams)
-      toast.success('密码修改成功')
+      toast.success(t('auth.passwordChangeSuccess'))
       setChangePasswordOpen(false)
       setPasswordForm({ old_password: '', new_password: '', confirm_password: '' })
     } catch (error: any) {
-      toast.error(error.message || '密码修改失败')
+      toast.error(error.message || t('auth.passwordChangeFailed'))
     }
   }
+
+  // 侧边栏拖动调整宽度
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+  }, [])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return
+      const newWidth = Math.min(Math.max(e.clientX, 160), 320)
+      setSidebarWidth(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      if (isResizing) {
+        setIsResizing(false)
+        localStorage.setItem('sidebarWidth', sidebarWidth.toString())
+      }
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing, sidebarWidth])
 
   // 渲染菜单项
   const renderMenuItem = (menu: any, level = 0) => {
@@ -255,16 +296,16 @@ const Layout = () => {
               : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
           )}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             {IconComponent && (
               <div className={cn(
-                "flex h-6 w-6 items-center justify-center rounded-md transition-colors",
+                "flex h-6 w-6 shrink-0 items-center justify-center rounded-md transition-colors",
                 isActive ? "bg-primary-foreground/20" : "bg-sidebar-accent"
               )}>
                 <IconComponent className="h-3.5 w-3.5" />
               </div>
             )}
-            <span>{getMenuTranslation(menu.name, t)}</span>
+            <span className="truncate">{getMenuTranslation(menu.name, t)}</span>
           </div>
           {hasChildren && (
             <ChevronRight className={cn("h-3.5 w-3.5 transition-transform duration-200", isExpanded && "rotate-90")} />
@@ -294,13 +335,16 @@ const Layout = () => {
       )}
 
       {/* Sidebar */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-50 w-52 transition-transform duration-300 ease-out",
-        "bg-sidebar/80 backdrop-blur-xl border-r border-sidebar-border/50",
-        "md:translate-x-0",
-        mobileSidebarOpen ? "translate-x-0" : "-translate-x-full",
-        !sidebarOpen && "md:-translate-x-full"
-      )}>
+      <aside
+        style={{ width: sidebarOpen ? sidebarWidth : 0 }}
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-out",
+          "bg-sidebar/80 backdrop-blur-xl border-r border-sidebar-border/50",
+          "md:translate-x-0",
+          mobileSidebarOpen ? "translate-x-0 !w-52" : "-translate-x-full",
+          !sidebarOpen && "md:-translate-x-full"
+        )}
+      >
         <div className="flex h-full flex-col">
           {/* Logo */}
           <div className="relative flex h-12 items-center justify-center px-3 border-b border-sidebar-border/50">
@@ -384,13 +428,28 @@ const Layout = () => {
             </DropdownMenu>
           </div>
         </div>
+        {/* Resize Handle */}
+        <div
+          onMouseDown={handleMouseDown}
+          className={cn(
+            "absolute top-0 right-0 w-1 h-full cursor-col-resize hidden md:flex items-center justify-center",
+            "hover:bg-primary/20 transition-colors group",
+            isResizing && "bg-primary/30"
+          )}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+        </div>
       </aside>
 
       {/* Main content */}
-      <div className={cn(
-        "min-h-screen transition-all duration-300 ease-out",
-        sidebarOpen ? "md:ml-52" : "md:ml-0"
-      )}>
+      <div
+        style={{ marginLeft: sidebarOpen ? sidebarWidth : 0 }}
+        className={cn(
+          "min-h-screen transition-all duration-300 ease-out",
+          "md:ml-0",
+          !sidebarOpen && "!ml-0"
+        )}
+      >
         {/* Header */}
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-border/50 bg-background/80 backdrop-blur-xl px-4">
           <Button variant="ghost" size="icon" className="md:hidden hover:bg-accent" onClick={() => setMobileSidebarOpen(true)}>

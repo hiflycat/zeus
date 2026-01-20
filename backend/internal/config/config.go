@@ -32,6 +32,7 @@ type SSOConfig struct {
 	Issuer  string     `yaml:"issuer"` // OIDC issuer URL
 	OIDC    OIDCConfig `yaml:"oidc"`
 	LDAP    LDAPConfig `yaml:"ldap"`
+	CAS     CASConfig  `yaml:"cas"`
 }
 
 // OIDCConfig OIDC Provider 配置
@@ -48,6 +49,14 @@ type LDAPConfig struct {
 	BaseDN        string `yaml:"base_dn"`
 	AdminDN       string `yaml:"admin_dn"`
 	AdminPassword string `yaml:"admin_password"`
+}
+
+// CASConfig CAS 配置
+type CASConfig struct {
+	Enabled      bool `yaml:"enabled"`       // 是否启用 CAS
+	TicketTTL    int  `yaml:"ticket_ttl"`    // ST/PT 有效期（秒）
+	TGTTTL       int  `yaml:"tgt_ttl"`       // TGT 有效期（秒）
+	SingleLogout bool `yaml:"single_logout"` // 是否启用单点登出
 }
 
 // DatabaseConfig 数据库配置
@@ -248,6 +257,13 @@ func setDefaults(config *Config) {
 	}
 	if config.SSO.LDAP.BaseDN == "" {
 		config.SSO.LDAP.BaseDN = "dc=zeus,dc=local"
+	}
+	// CAS 默认配置
+	if config.SSO.CAS.TicketTTL == 0 {
+		config.SSO.CAS.TicketTTL = 10 // 10秒
+	}
+	if config.SSO.CAS.TGTTTL == 0 {
+		config.SSO.CAS.TGTTTL = 28800 // 8小时
 	}
 }
 

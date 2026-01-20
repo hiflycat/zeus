@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { Plus, Copy, Eye, EyeOff, X } from 'lucide-react'
+import { Plus, Copy, Eye, EyeOff } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import {
   Button, Input, Card, CardContent, CardHeader, CardTitle,
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableActions, TableActionButton,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableActions, TableActionButton, TableEmpty,
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
   Label, Badge, Switch,
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -25,8 +25,7 @@ interface OIDCClient {
   client_secret: string
   name: string
   description: string
-  redirect_uris: string
-  post_logout_redirect_uris: string
+  root_url: string
   allowed_scopes: string
   grant_types: string
   access_token_ttl: number
@@ -43,10 +42,6 @@ const ClientManage = () => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingClient, setEditingClient] = useState<OIDCClient | null>(null)
   const [showSecret, setShowSecret] = useState<Record<number, boolean>>({})
-  const [redirectUris, setRedirectUris] = useState<string[]>([])
-  const [newRedirectUri, setNewRedirectUri] = useState('')
-  const [postLogoutRedirectUris, setPostLogoutRedirectUris] = useState<string[]>([])
-  const [newPostLogoutRedirectUri, setNewPostLogoutRedirectUri] = useState('')
   const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<OIDCClient>()
   const [form, setForm] = useState({
     tenant_id: 0,
@@ -54,7 +49,7 @@ const ClientManage = () => {
     client_secret: '',
     name: '',
     description: '',
-    redirect_uris: '[]',
+    root_url: '',
     allowed_scopes: 'openid profile email',
     grant_types: 'authorization_code',
     access_token_ttl: 3600,
@@ -99,17 +94,13 @@ const ClientManage = () => {
 
   const handleCreate = () => {
     setEditingClient(null)
-    setRedirectUris([])
-    setNewRedirectUri('')
-    setPostLogoutRedirectUris([])
-    setNewPostLogoutRedirectUri('')
     setForm({
       tenant_id: tenants[0]?.id || 0,
       client_id: generateClientId(),
       client_secret: generateClientSecret(),
       name: '',
       description: '',
-      redirect_uris: '[]',
+      root_url: '',
       allowed_scopes: 'openid profile email',
       grant_types: 'authorization_code',
       access_token_ttl: 3600,
@@ -121,25 +112,13 @@ const ClientManage = () => {
 
   const handleEdit = (client: OIDCClient) => {
     setEditingClient(client)
-    try {
-      setRedirectUris(JSON.parse(client.redirect_uris || '[]'))
-    } catch {
-      setRedirectUris([])
-    }
-    try {
-      setPostLogoutRedirectUris(JSON.parse(client.post_logout_redirect_uris || '[]'))
-    } catch {
-      setPostLogoutRedirectUris([])
-    }
-    setNewRedirectUri('')
-    setNewPostLogoutRedirectUri('')
     setForm({
       tenant_id: client.tenant_id,
       client_id: client.client_id,
       client_secret: client.client_secret,
       name: client.name,
       description: client.description,
-      redirect_uris: client.redirect_uris,
+      root_url: client.root_url || '',
       allowed_scopes: client.allowed_scopes,
       grant_types: client.grant_types,
       access_token_ttl: client.access_token_ttl,
@@ -163,16 +142,11 @@ const ClientManage = () => {
 
   const handleSubmit = async () => {
     try {
-      const submitData = {
-        ...form,
-        redirect_uris: JSON.stringify(redirectUris),
-        post_logout_redirect_uris: JSON.stringify(postLogoutRedirectUris)
-      }
       if (editingClient) {
-        await request.put(`/sso/clients/${editingClient.id}`, submitData)
+        await request.put(`/sso/clients/${editingClient.id}`, form)
         toast.success(t('sso.common.updateSuccess'))
       } else {
-        await request.post('/sso/clients', submitData)
+        await request.post('/sso/clients', form)
         toast.success(t('sso.common.createSuccess'))
       }
       setDialogOpen(false)
@@ -180,28 +154,6 @@ const ClientManage = () => {
     } catch (error: any) {
       toast.error(error.message || t('sso.common.operationFailed'))
     }
-  }
-
-  const addRedirectUri = () => {
-    if (newRedirectUri && !redirectUris.includes(newRedirectUri)) {
-      setRedirectUris([...redirectUris, newRedirectUri])
-      setNewRedirectUri('')
-    }
-  }
-
-  const removeRedirectUri = (uri: string) => {
-    setRedirectUris(redirectUris.filter(u => u !== uri))
-  }
-
-  const addPostLogoutRedirectUri = () => {
-    if (newPostLogoutRedirectUri && !postLogoutRedirectUris.includes(newPostLogoutRedirectUri)) {
-      setPostLogoutRedirectUris([...postLogoutRedirectUris, newPostLogoutRedirectUri])
-      setNewPostLogoutRedirectUri('')
-    }
-  }
-
-  const removePostLogoutRedirectUri = (uri: string) => {
-    setPostLogoutRedirectUris(postLogoutRedirectUris.filter(u => u !== uri))
   }
 
   const copyToClipboard = (text: string) => {
@@ -254,7 +206,10 @@ const ClientManage = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {clients.map((client) => (
+              {clients.length === 0 ? (
+                <TableEmpty colSpan={7} message={t('common.noData')} />
+              ) : (
+                clients.map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>{tenants.find(tenant => tenant.id === client.tenant_id)?.name || '-'}</TableCell>
                   <TableCell>
@@ -313,7 +268,8 @@ const ClientManage = () => {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
@@ -353,52 +309,12 @@ const ClientManage = () => {
               <Input value={form.client_secret} onChange={(e) => setForm({ ...form, client_secret: e.target.value })} />
             </div>
             <div className="col-span-2 space-y-2">
-              <Label>{t('sso.client.redirectUris')}</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={newRedirectUri}
-                  onChange={(e) => setNewRedirectUri(e.target.value)}
-                  placeholder={t('sso.client.redirectUriPlaceholder')}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addRedirectUri())}
-                />
-                <Button type="button" variant="outline" onClick={addRedirectUri}>{t('sso.client.addRedirectUri')}</Button>
-              </div>
-              {redirectUris.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {redirectUris.map((uri) => (
-                    <div key={uri} className="flex items-center gap-1 bg-muted px-2 py-1 rounded text-sm">
-                      <span className="max-w-[300px] truncate">{uri}</span>
-                      <button type="button" onClick={() => removeRedirectUri(uri)} className="text-muted-foreground hover:text-foreground">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="col-span-2 space-y-2">
-              <Label>{t('sso.client.postLogoutRedirectUris')}</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={newPostLogoutRedirectUri}
-                  onChange={(e) => setNewPostLogoutRedirectUri(e.target.value)}
-                  placeholder={t('sso.client.postLogoutRedirectUriPlaceholder')}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPostLogoutRedirectUri())}
-                />
-                <Button type="button" variant="outline" onClick={addPostLogoutRedirectUri}>{t('sso.client.addRedirectUri')}</Button>
-              </div>
-              {postLogoutRedirectUris.length > 0 && (
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {postLogoutRedirectUris.map((uri) => (
-                    <div key={uri} className="flex items-center gap-1 bg-muted px-2 py-1 rounded text-sm">
-                      <span className="max-w-[300px] truncate">{uri}</span>
-                      <button type="button" onClick={() => removePostLogoutRedirectUri(uri)} className="text-muted-foreground hover:text-foreground">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <Label>{t('sso.client.rootUrl')}</Label>
+              <Input
+                value={form.root_url}
+                onChange={(e) => setForm({ ...form, root_url: e.target.value })}
+                placeholder="https://app.example.com"
+              />
             </div>
             <div className="space-y-2">
               <Label>{t('sso.client.allowedScopes')}</Label>

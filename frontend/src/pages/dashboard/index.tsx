@@ -120,7 +120,7 @@ const Dashboard = () => {
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-primary to-primary/60 animate-pulse" />
-            <Sparkles className="absolute -top-1 -right-1 h-5 w-5 text-primary animate-bounce" />
+            <Sparkles className="absolute -top-1 -right-1 h-5 w-5 text-primary motion-safe:animate-bounce" />
           </div>
           <p className="text-sm text-muted-foreground">{t('common.loading')}</p>
         </div>
@@ -150,11 +150,11 @@ const Dashboard = () => {
               <div className="flex items-center gap-4 pt-2">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-primary/10 text-xs font-semibold text-primary">{categories.length}</span>
-                  <span>分类</span>
+                  <span>{t('dashboard.categories')}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500/10 text-xs font-semibold text-emerald-600 dark:text-emerald-400">{totalNavCount}</span>
-                  <span>站点</span>
+                  <span>{t('dashboard.sites')}</span>
                 </div>
               </div>
             </div>
@@ -167,12 +167,14 @@ const Dashboard = () => {
                   type="text"
                   value={searchKeyword}
                   onChange={(e) => setSearchKeyword(e.target.value)}
-                  placeholder="搜索站点..."
+                  placeholder={t('dashboard.searchPlaceholder')}
+                  aria-label={t('dashboard.searchPlaceholder')}
                   className="w-full h-10 pl-10 pr-10 rounded-xl bg-background/80 backdrop-blur-sm border border-border/50 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/50 transition-all"
                 />
                 {searchKeyword && (
                   <button
                     onClick={() => setSearchKeyword('')}
+                    aria-label={t('dashboard.clearSearch')}
                     className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded-md transition-colors"
                   >
                     <X className="h-3 w-3 text-muted-foreground" />
@@ -195,7 +197,7 @@ const Dashboard = () => {
               : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
-          全部
+          {t('dashboard.all')}
         </button>
         {categories.filter(c => hasNavigationsInTree(c)).map((cat, idx) => {
           const color = categoryColors[idx % categoryColors.length]
@@ -339,7 +341,7 @@ const Dashboard = () => {
                         <div className="flex items-center gap-2">
                           <div className={cn("w-1 h-4 rounded-full bg-gradient-to-b", color.gradient)} />
                           <h3 className="text-sm font-semibold text-foreground">{sub.name}</h3>
-                          <span className="text-xs text-muted-foreground">{filteredSubNavs.length} 个站点</span>
+                          <span className="text-xs text-muted-foreground">{t('dashboard.siteCount', { count: filteredSubNavs.length })}</span>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
                           {filteredSubNavs.map((nav) => (
@@ -371,8 +373,8 @@ const Dashboard = () => {
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50 mb-4">
             <Search className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-1">未找到结果</h3>
-          <p className="text-sm text-muted-foreground">尝试使用其他关键词搜索</p>
+          <h3 className="text-lg font-semibold text-foreground mb-1">{t('dashboard.noResults')}</h3>
+          <p className="text-sm text-muted-foreground">{t('dashboard.tryOtherKeywords')}</p>
         </div>
       )}
     </div>
@@ -394,7 +396,7 @@ const NavigationCard = ({ nav, hasError, onError }: { nav: Navigation; hasError:
     >
       <div className="shrink-0 flex h-10 w-10 items-center justify-center rounded-lg bg-muted/50 border border-border/50 overflow-hidden group-hover:border-primary/20 transition-colors">
         {nav.icon && !hasError ? (
-          <img src={nav.icon} alt="" className="w-6 h-6 object-contain" onError={onError} />
+          <img src={nav.icon} alt={nav.name} className="w-6 h-6 object-contain" onError={onError} />
         ) : (
           <Globe className="h-5 w-5 text-muted-foreground" />
         )}

@@ -1,12 +1,13 @@
 package middleware
 
 import (
-	"encoding/base64"
 	"strings"
 
-	"github.com/gin-gonic/gin"
+	"backend/internal/service/sso"
 	"backend/pkg/jwt"
 	"backend/pkg/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // AuthMiddleware JWT 认证中间件
@@ -49,20 +50,11 @@ func SSOSessionMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sessionCookie, err := c.Cookie("sso_session")
 		if err == nil && sessionCookie != "" {
-			// 解析会话令牌获取用户 ID
-			if userID := parseSessionToken(sessionCookie); userID > 0 {
+			// 解析并验证会话令牌
+			if userID, err := sso.ParseSessionToken(sessionCookie); err == nil && userID > 0 {
 				c.Set("sso_user_id", userID)
 			}
 		}
 		c.Next()
 	}
-}
-
-// parseSessionToken 解析会话令牌
-func parseSessionToken(token string) uint {
-	decoded, err := base64.RawURLEncoding.DecodeString(token)
-	if err != nil || len(decoded) < 4 {
-		return 0
-	}
-	return uint(decoded[0])<<24 | uint(decoded[1])<<16 | uint(decoded[2])<<8 | uint(decoded[3])
 }

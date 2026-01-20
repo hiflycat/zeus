@@ -154,6 +154,11 @@ func SetupRouter() *gin.Engine {
 	cfg := config.Get()
 	if cfg != nil && cfg.SSO.Enabled {
 		setupSSOProviderRoutes(r, cfg.SSO.Issuer)
+
+		// CAS 路由（仅在启用时注册）
+		if cfg.SSO.CAS.Enabled {
+			setupCASRoutes(r, cfg.SSO.Issuer, &cfg.SSO.CAS)
+		}
 	}
 
 	return r
@@ -236,12 +241,28 @@ func setupSSOProviderRoutes(r *gin.Engine, issuer string) {
 		oauth.POST("/logout", oidcHandler.Logout)
 	}
 
-	// SSO 登录页面路由
+	// SSO 登录 API 路由
 	sso := r.Group("/sso")
 	{
-		sso.GET("/login", func(c *gin.Context) {
-			c.File("./static/sso/login.html")
-		})
 		sso.POST("/auth/login", oidcHandler.Login)
+	}
+}
+
+// setupCASRoutes 设置 CAS 路由
+func setupCASRoutes(r *gin.Engine, issuer string, cfg *config.CASConfig) {
+	casHandler := ssoHandler.NewCASHandler(issuer, cfg)
+
+	cas := r.Group("/cas")
+	{
+		// CAS 1.0/2.0/3.0 端点
+		cas.GET("/login", casHandler.Login)
+		cas.POST("/login", casHandler.Login)
+		cas.GET("/logout", casHandler.Logout)
+		cas.GET("/validate", casHandler.Validate)
+		cas.GET("/serviceValidate", casHandler.ServiceValidate)
+		cas.GET("/p3/serviceValidate", casHandler.P3ServiceValidate)
+		cas.GET("/proxyValidate", casHandler.ProxyValidate)
+		cas.GET("/proxy", casHandler.Proxy)
+		cas.POST("/samlValidate", casHandler.SAMLValidate)
 	}
 }

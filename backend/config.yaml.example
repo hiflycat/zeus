@@ -32,7 +32,7 @@ log:
   max_age: 7 # days
   compress: true
 
-# SSO 配置（OIDC Provider + LDAP Server）
+# SSO 配置（OIDC Provider + LDAP Server + CAS Server）
 sso:
   enabled: false # 是否启用 SSO 服务
   issuer: http://localhost:8080 # OIDC issuer URL
@@ -46,3 +46,9 @@ sso:
     enabled: false              # 是否启用 LDAP 服务
     port: 389                   # LDAP 端口
     base_dn: dc=zeus,dc=local   # Base DN
+  # CAS Server 配置
+  cas:
+    enabled: false              # 是否启用 CAS 服务
+    ticket_ttl: 10              # ST/PT 有效期（秒），默认 10 秒
+    tgt_ttl: 28800              # TGT 有效期（秒），默认 8 小时
+    single_logout: true         # 是否启用单点登出

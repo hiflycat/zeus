@@ -50,7 +50,11 @@
     "oidcConfigFailed": "Failed to get OIDC configuration",
     "ssoLogin": "SSO Login",
     "or": "OR",
-    "defaultSystemName": "Admin Management System"
+    "defaultSystemName": "Admin Management System",
+    "passwordMismatch": "Passwords do not match",
+    "passwordTooShort": "Password must be at least 6 characters",
+    "passwordChangeSuccess": "Password changed successfully",
+    "passwordChangeFailed": "Failed to change password"
   },
   "menu": {
     "dashboard": "Dashboard",
@@ -60,6 +64,7 @@
     "permissionManagement": "Permission Management",
     "menuManagement": "Menu Management",
     "systemSettings": "System Settings",
+    "apiManagement": "API Management",
     "currentRole": "Current Role",
     "current": "Current",
     "switch": "Switch",
@@ -244,7 +249,15 @@
     "deletedMenuItem": "Deleted menu item",
     "modifiedSystemSettings": "Modified system settings",
     "minutesAgo": "{{count}} minutes ago",
-    "hoursAgo": "{{count}} hours ago"
+    "hoursAgo": "{{count}} hours ago",
+    "categories": "Categories",
+    "sites": "Sites",
+    "all": "All",
+    "siteCount": "{{count}} sites",
+    "noResults": "No results found",
+    "tryOtherKeywords": "Try searching with different keywords",
+    "searchPlaceholder": "Search sites...",
+    "clearSearch": "Clear search"
   },
   "oidc": {
     "verifying": "Verifying login information...",
@@ -313,6 +326,7 @@
       "description": "Description",
       "clientId": "Client ID",
       "clientSecret": "Client Secret",
+      "rootUrl": "Root URL",
       "redirectUris": "Redirect URIs",
       "postLogoutRedirectUris": "Post Logout Redirect URIs",
       "allowedScopes": "Allowed Scopes",
@@ -356,6 +370,18 @@
       "fillComplete": "Please fill in all login information",
       "success": "Login successful",
       "failed": "Login failed"
+    },
+    "error": {
+      "title": "Authentication Error",
+      "invalidClient": "Invalid Application",
+      "invalidClientDesc": "The requested application does not exist or has been disabled",
+      "invalidRedirectUri": "Invalid Redirect URI",
+      "invalidRedirectUriDesc": "The redirect URI does not match the application configuration",
+      "accessDenied": "Access Denied",
+      "accessDeniedDesc": "You do not have permission to access this application",
+      "unknownError": "Authentication Failed",
+      "unknownErrorDesc": "An unknown error occurred, please try again later",
+      "contactAdmin": "If you have questions, please contact the system administrator"
     },
     "authorize": {
       "title": "Authorization",

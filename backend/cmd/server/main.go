@@ -5,9 +5,11 @@ import (
 	"backend/internal/config"
 	"backend/internal/ldap"
 	"backend/internal/router"
+	ssoService "backend/internal/service/sso"
 	"backend/migrations"
 	"backend/pkg/jwt"
 	"backend/pkg/logger"
+	"backend/pkg/scheduler"
 	_ "backend/statik" // 导入 statik 生成的包
 	"context"
 	"fmt"
@@ -98,6 +100,11 @@ func main() {
 	// 初始化 JWT
 	jwt.Init(&cfg.JWT)
 
+	// 启动定时任务调度器
+	sched := scheduler.New()
+	sched.Register(&ssoService.TokenCleanupJob{}, time.Hour)
+	sched.Start()
+
 	// 设置 Gin 模式
 	ginMode := cfg.Server.Mode
 	if ginMode == "" {
@@ -144,6 +151,9 @@ func main() {
 	<-quit
 
 	logger.Info("Shutting down server...")
+
+	// 停止定时任务调度器
+	sched.Stop()
 
 	// 停止 LDAP 服务器
 	if ldapServer != nil {

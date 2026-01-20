@@ -1,6 +1,8 @@
 package sso
 
 import (
+	"strings"
+
 	"backend/internal/model/sso"
 	"backend/migrations"
 	"backend/pkg/utils"
@@ -248,21 +250,25 @@ func (s *OIDCClientService) GetByClientID(clientID string) (*sso.OIDCClient, err
 
 // Create 创建客户端
 func (s *OIDCClientService) Create(client *sso.OIDCClient) error {
+	// 去除 RootURL 末尾的 /
+	client.RootURL = strings.TrimSuffix(client.RootURL, "/")
 	return migrations.GetDB().Create(client).Error
 }
 
 // Update 更新客户端
 func (s *OIDCClientService) Update(client *sso.OIDCClient) error {
+	// 去除 RootURL 末尾的 /
+	rootURL := strings.TrimSuffix(client.RootURL, "/")
 	return migrations.GetDB().Model(client).Updates(map[string]interface{}{
-		"client_secret":    client.ClientSecret,
-		"name":             client.Name,
-		"description":      client.Description,
-		"redirect_uris":    client.RedirectURIs,
-		"allowed_scopes":   client.AllowedScopes,
-		"grant_types":      client.GrantTypes,
-		"access_token_ttl": client.AccessTokenTTL,
+		"client_secret":     client.ClientSecret,
+		"name":              client.Name,
+		"description":       client.Description,
+		"root_url":          rootURL,
+		"allowed_scopes":    client.AllowedScopes,
+		"grant_types":       client.GrantTypes,
+		"access_token_ttl":  client.AccessTokenTTL,
 		"refresh_token_ttl": client.RefreshTokenTTL,
-		"status":           client.Status,
+		"status":            client.Status,
 	}).Error
 }
 

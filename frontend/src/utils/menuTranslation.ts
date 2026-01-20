@@ -17,6 +17,10 @@ const menuNameMap: Record<string, string> = {
   'Menu Management': 'menu.menuManagement',
   '系统设置': 'menu.systemSettings',
   'System Settings': 'menu.systemSettings',
+  // API 管理
+  'API管理': 'menu.apiManagement',
+  'API 管理': 'menu.apiManagement',
+  'API Management': 'menu.apiManagement',
   // SSO 管理
   'SSO 管理': 'sso.title',
   'SSO Management': 'sso.title',
