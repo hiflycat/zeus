@@ -39,7 +39,7 @@ func (h *CASHandler) Login(c *gin.Context) {
 	// 验证 service URL
 	if service != "" {
 		if _, err := h.service.ValidateService(service); err != nil {
-			c.String(400, "INVALID_SERVICE")
+			c.Redirect(302, "/sso/error?type=invalid_redirect_uri")
 			return
 		}
 	}
