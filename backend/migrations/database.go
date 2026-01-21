@@ -90,6 +90,15 @@ func Migrate() error {
 		&model.SystemConfig{},
 		&model.NavigationCategory{},
 		&model.Navigation{},
+		// 工单相关模型
+		&model.TicketType{},
+		&model.Ticket{},
+		&model.ApprovalFlow{},
+		&model.ApprovalNode{},
+		&model.ApprovalRecord{},
+		&model.TicketComment{},
+		&model.TicketAttachment{},
+		&model.TicketTemplate{},
 	); err != nil {
 		return err
 	}
