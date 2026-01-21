@@ -187,6 +187,17 @@ func SetupRouter() *gin.Engine {
 				approvalFlow.PUT("/:id/nodes", approvalFlowHandler.SaveNodes)
 			}
 
+			// 附件管理
+			attachmentHandler := handler.NewAttachmentHandler()
+			attachment := auth.Group("/attachments")
+			attachment.Use(middleware.CasbinRBACMiddleware())
+			{
+				attachment.POST("/ticket/:ticket_id", attachmentHandler.Upload)
+				attachment.GET("/ticket/:ticket_id", attachmentHandler.List)
+				attachment.GET("/:id/download", attachmentHandler.GetDownloadURL)
+				attachment.DELETE("/:id", attachmentHandler.Delete)
+			}
+
 		}
 	}
 
