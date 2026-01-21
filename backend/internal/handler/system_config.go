@@ -10,12 +10,15 @@ import (
 // SystemConfigHandler 系统配置处理器
 type SystemConfigHandler struct {
 	systemConfigService *service.SystemConfigService
+	svc                 *service.SystemConfigService
 }
 
 // NewSystemConfigHandler 创建系统配置处理器
 func NewSystemConfigHandler() *SystemConfigHandler {
+	svc := service.NewSystemConfigService()
 	return &SystemConfigHandler{
-		systemConfigService: service.NewSystemConfigService(),
+		systemConfigService: svc,
+		svc:                 svc,
 	}
 }
 
@@ -124,4 +127,55 @@ func (h *SystemConfigHandler) TestEmail(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{"message": "测试邮件发送成功"})
+}
+
+// GetStorageConfig 获取存储配置
+func (h *SystemConfigHandler) GetStorageConfig(c *gin.Context) {
+	value, _ := h.svc.GetByKey("storage")
+	response.Success(c, gin.H{"value": value})
+}
+
+// UpdateStorageConfig 更新存储配置
+func (h *SystemConfigHandler) UpdateStorageConfig(c *gin.Context) {
+	var req struct {
+		Value string `json:"value"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.svc.Set("storage", req.Value); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+// GetNotifyConfig 获取通知配置
+func (h *SystemConfigHandler) GetNotifyConfig(c *gin.Context) {
+	dingtalk, _ := h.svc.GetByKey("notify.dingtalk")
+	wechat, _ := h.svc.GetByKey("notify.wechat")
+	response.Success(c, gin.H{
+		"dingtalk": dingtalk,
+		"wechat":   wechat,
+	})
+}
+
+// UpdateNotifyConfig 更新通知配置
+func (h *SystemConfigHandler) UpdateNotifyConfig(c *gin.Context) {
+	var req struct {
+		DingTalk string `json:"dingtalk"`
+		WeChat   string `json:"wechat"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if req.DingTalk != "" {
+		h.svc.Set("notify.dingtalk", req.DingTalk)
+	}
+	if req.WeChat != "" {
+		h.svc.Set("notify.wechat", req.WeChat)
+	}
+	response.Success(c, nil)
 }

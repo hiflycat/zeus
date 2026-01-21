@@ -139,6 +139,10 @@ func SetupRouter() *gin.Engine {
 				systemConfig.GET("/email", systemConfigHandler.GetEmailConfig)
 				systemConfig.PUT("/email", systemConfigHandler.UpdateEmailConfig)
 				systemConfig.POST("/email/test", systemConfigHandler.TestEmail)
+				systemConfig.GET("/storage", systemConfigHandler.GetStorageConfig)
+				systemConfig.PUT("/storage", systemConfigHandler.UpdateStorageConfig)
+				systemConfig.GET("/notify", systemConfigHandler.GetNotifyConfig)
+				systemConfig.PUT("/notify", systemConfigHandler.UpdateNotifyConfig)
 			}
 
 			// 工单类型管理

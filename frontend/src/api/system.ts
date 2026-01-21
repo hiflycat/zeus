@@ -63,3 +63,60 @@ export const saveSystemConfig = (key: string, data: any): Promise<void> => {
 export const sendTestEmail = (to: string): Promise<void> => {
   return testEmail(to)
 }
+
+// 存储配置接口
+export interface StorageConfig {
+  provider: 'oss' | 's3'
+  oss?: {
+    endpoint: string
+    access_key_id: string
+    access_key_secret: string
+    bucket: string
+  }
+  s3?: {
+    region: string
+    access_key_id: string
+    secret_access_key: string
+    bucket: string
+    endpoint?: string
+  }
+}
+
+// 获取存储配置
+export const getStorageConfig = (): Promise<{ value: StorageConfig | null }> => {
+  return request.get('/system-config/storage')
+}
+
+// 更新存储配置
+export const updateStorageConfig = (config: StorageConfig): Promise<void> => {
+  return request.put('/system-config/storage', { value: JSON.stringify(config) })
+}
+
+// 通知配置接口
+export interface NotifyDingTalkConfig {
+  enabled: boolean
+  webhook: string
+  secret: string
+}
+
+export interface NotifyWeChatConfig {
+  enabled: boolean
+  corp_id: string
+  agent_id: string
+  secret: string
+}
+
+export interface NotifyConfig {
+  dingtalk: NotifyDingTalkConfig | null
+  wechat: NotifyWeChatConfig | null
+}
+
+// 获取通知配置
+export const getNotifyConfig = (): Promise<NotifyConfig> => {
+  return request.get('/system-config/notify')
+}
+
+// 更新通知配置
+export const updateNotifyConfig = (config: { dingtalk?: string; wechat?: string }): Promise<void> => {
+  return request.put('/system-config/notify', config)
+}

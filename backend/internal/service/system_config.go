@@ -30,6 +30,28 @@ func (s *SystemConfigService) GetByKey(key string) (*model.SystemConfig, error) 
 	return &config, nil
 }
 
+// Set 设置配置值
+func (s *SystemConfigService) Set(key string, value string) error {
+	var existingConfig model.SystemConfig
+	if err := migrations.GetDB().Where("`key` = ?", key).First(&existingConfig).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 如果不存在，创建新配置
+			newConfig := model.SystemConfig{
+				Key:      key,
+				Value:    value,
+				Type:     "json",
+				Category: "system",
+			}
+			return migrations.GetDB().Create(&newConfig).Error
+		}
+		return err
+	}
+
+	// 更新现有配置
+	existingConfig.Value = value
+	return migrations.GetDB().Save(&existingConfig).Error
+}
+
 // GetOIDCConfig 获取 OIDC 配置
 func (s *SystemConfigService) GetOIDCConfig() (*OIDCConfigData, error) {
 	config, err := s.GetByKey("oidc")
