@@ -20,6 +20,7 @@ const APIList = lazy(() => import('@/pages/api/List'))
 const MenuList = lazy(() => import('@/pages/menu/List'))
 const NavigationPage = lazy(() => import('@/pages/navigation'))
 const SystemSettings = lazy(() => import('@/pages/system/settings'))
+const TicketList = lazy(() => import('@/pages/ticket/List'))
 
 // SSO 页面
 const SSOLogin = lazy(() => import('@/pages/sso/Login'))
@@ -70,6 +71,9 @@ export const AppRouter = () => {
             <Route path="menu" element={<MenuList />} />
             <Route path="navigation" element={<NavigationPage />} />
             <Route path="settings" element={<SystemSettings />} />
+          </Route>
+          <Route path="ticket">
+            <Route index element={<TicketList />} />
           </Route>
           {/* SSO 管理页面 */}
           <Route path="sso">
