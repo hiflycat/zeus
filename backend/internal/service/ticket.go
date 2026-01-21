@@ -8,10 +8,14 @@ import (
 	"backend/migrations"
 )
 
-type TicketService struct{}
+type TicketService struct {
+	notifySvc *NotificationService
+}
 
 func NewTicketService() *TicketService {
-	return &TicketService{}
+	return &TicketService{
+		notifySvc: NewNotificationService(),
+	}
 }
 
 func (s *TicketService) Create(ticket *model.Ticket) error {
@@ -75,23 +79,35 @@ func (s *TicketService) Submit(id uint) error {
 	var flow model.ApprovalFlow
 	if err := migrations.GetDB().Where("type_id = ? AND enabled = ?", ticket.TypeID, true).First(&flow).Error; err != nil {
 		// 没有审批流程，直接进入处理中
-		return migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status": model.TicketStatusProcessing,
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+		go s.notifySvc.NotifyTicketCreated(&ticket)
+		return nil
 	}
 
 	// 查找第一个审批节点
 	var firstNode model.ApprovalNode
 	if err := migrations.GetDB().Where("flow_id = ?", flow.ID).Order("sort_order ASC").First(&firstNode).Error; err != nil {
-		return migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status": model.TicketStatusProcessing,
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+		go s.notifySvc.NotifyTicketCreated(&ticket)
+		return nil
 	}
 
-	return migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+	if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
 		"status":          model.TicketStatusPending,
 		"current_node_id": firstNode.ID,
-	}).Error
+	}).Error; err != nil {
+		return err
+	}
+	go s.notifySvc.NotifyTicketCreated(&ticket)
+	return nil
 }
 
 // Approve 审批工单
@@ -124,10 +140,14 @@ func (s *TicketService) Approve(id, approverID uint, approved bool, comment stri
 	}
 
 	if !approved {
-		return migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status":          model.TicketStatusRejected,
 			"current_node_id": nil,
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+		go s.notifySvc.NotifyTicketApproved(&ticket, approved, comment)
+		return nil
 	}
 
 	// 查找下一个审批节点
@@ -138,22 +158,37 @@ func (s *TicketService) Approve(id, approverID uint, approved bool, comment stri
 	if err := migrations.GetDB().Where("flow_id = ? AND sort_order > ?", currentNode.FlowID, currentNode.SortOrder).
 		Order("sort_order ASC").First(&nextNode).Error; err != nil {
 		// 没有下一个节点，审批完成
-		return migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status":          model.TicketStatusProcessing,
 			"current_node_id": nil,
-		}).Error
+		}).Error; err != nil {
+			return err
+		}
+		go s.notifySvc.NotifyTicketApproved(&ticket, approved, comment)
+		return nil
 	}
 
-	return migrations.GetDB().Model(&ticket).Update("current_node_id", nextNode.ID).Error
+	if err := migrations.GetDB().Model(&ticket).Update("current_node_id", nextNode.ID).Error; err != nil {
+		return err
+	}
+	go s.notifySvc.NotifyTicketApproved(&ticket, approved, comment)
+	return nil
 }
 
 // Complete 完成工单
 func (s *TicketService) Complete(id uint) error {
 	now := time.Now()
-	return migrations.GetDB().Model(&model.Ticket{}).Where("id = ?", id).Updates(map[string]interface{}{
+	if err := migrations.GetDB().Model(&model.Ticket{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"status":       model.TicketStatusCompleted,
 		"completed_at": &now,
-	}).Error
+	}).Error; err != nil {
+		return err
+	}
+	var ticket model.Ticket
+	if migrations.GetDB().First(&ticket, id).Error == nil {
+		go s.notifySvc.NotifyTicketCompleted(&ticket)
+	}
+	return nil
 }
 
 // Cancel 取消工单
