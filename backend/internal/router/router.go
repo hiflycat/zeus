@@ -154,6 +154,24 @@ func SetupRouter() *gin.Engine {
 				ticketType.DELETE("/:id", ticketTypeHandler.Delete)
 			}
 
+			// 工单管理
+			ticketHandler := handler.NewTicketHandler()
+			ticket := auth.Group("/tickets")
+			ticket.Use(middleware.CasbinRBACMiddleware())
+			{
+				ticket.GET("", ticketHandler.List)
+				ticket.GET("/my", ticketHandler.GetMyTickets)
+				ticket.GET("/pending", ticketHandler.GetPendingApprovals)
+				ticket.GET("/:id", ticketHandler.GetByID)
+				ticket.POST("", ticketHandler.Create)
+				ticket.PUT("/:id", ticketHandler.Update)
+				ticket.DELETE("/:id", ticketHandler.Delete)
+				ticket.POST("/:id/submit", ticketHandler.Submit)
+				ticket.POST("/:id/approve", ticketHandler.Approve)
+				ticket.POST("/:id/complete", ticketHandler.Complete)
+				ticket.POST("/:id/cancel", ticketHandler.Cancel)
+			}
+
 		}
 	}
 
