@@ -162,6 +162,7 @@ func SetupRouter() *gin.Engine {
 				ticket.GET("", ticketHandler.List)
 				ticket.GET("/my", ticketHandler.GetMyTickets)
 				ticket.GET("/pending", ticketHandler.GetPendingApprovals)
+				ticket.GET("/stats", handler.NewTicketStatsHandler().GetStats)
 				ticket.GET("/:id", ticketHandler.GetByID)
 				ticket.POST("", ticketHandler.Create)
 				ticket.PUT("/:id", ticketHandler.Update)

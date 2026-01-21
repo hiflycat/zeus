@@ -216,3 +216,15 @@ export const getAttachmentDownloadUrl = (id: number): Promise<{ url: string }> =
 export const deleteAttachment = (id: number): Promise<void> => {
   return request.delete(`/attachments/${id}`)
 }
+
+// ========== 统计 API ==========
+export interface TicketStats {
+  total: number
+  by_status: Record<string, number>
+  by_type: { type_name: string; count: number }[]
+  by_priority: Record<number, number>
+}
+
+export const getTicketStats = (): Promise<TicketStats> => {
+  return request.get('/tickets/stats')
+}

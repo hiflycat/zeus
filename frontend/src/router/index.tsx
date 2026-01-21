@@ -25,6 +25,7 @@ const TicketDetail = lazy(() => import('@/pages/ticket/Detail'))
 const TicketCreate = lazy(() => import('@/pages/ticket/Create'))
 const TicketTypeManage = lazy(() => import('@/pages/ticket/TypeManage'))
 const TicketFlowManage = lazy(() => import('@/pages/ticket/FlowManage'))
+const TicketStatistics = lazy(() => import('@/pages/ticket/Statistics'))
 
 // SSO 页面
 const SSOLogin = lazy(() => import('@/pages/sso/Login'))
@@ -81,6 +82,7 @@ export const AppRouter = () => {
             <Route path="create" element={<TicketCreate />} />
             <Route path="types" element={<TicketTypeManage />} />
             <Route path="flows" element={<TicketFlowManage />} />
+            <Route path="statistics" element={<TicketStatistics />} />
             <Route path=":id" element={<TicketDetail />} />
           </Route>
           {/* SSO 管理页面 */}
