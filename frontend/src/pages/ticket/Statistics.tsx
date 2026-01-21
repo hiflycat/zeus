@@ -73,7 +73,7 @@ const TicketStatistics = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-yellow-600">
-              {(stats.by_status.pending || 0) + (stats.by_status.processing || 0)}
+              {(stats.by_status?.pending || 0) + (stats.by_status?.processing || 0)}
             </div>
           </CardContent>
         </Card>
@@ -82,7 +82,7 @@ const TicketStatistics = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">已完成</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-green-600">{stats.by_status.completed || 0}</div>
+            <div className="text-3xl font-bold text-green-600">{stats.by_status?.completed || 0}</div>
           </CardContent>
         </Card>
         <Card>
@@ -90,7 +90,7 @@ const TicketStatistics = () => {
             <CardTitle className="text-sm font-medium text-muted-foreground">已拒绝</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold text-red-600">{stats.by_status.rejected || 0}</div>
+            <div className="text-3xl font-bold text-red-600">{stats.by_status?.rejected || 0}</div>
           </CardContent>
         </Card>
       </div>
@@ -102,7 +102,7 @@ const TicketStatistics = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {Object.entries(stats.by_status).map(([status, count]) => (
+              {Object.entries(stats.by_status || {}).map(([status, count]) => (
                 <div key={status} className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${statusColors[status] || 'bg-gray-500'}`} />
                   <span className="flex-1">{statusLabels[status] || status}</span>
@@ -125,7 +125,7 @@ const TicketStatistics = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {Object.entries(stats.by_priority).map(([priority, count]) => (
+              {Object.entries(stats.by_priority || {}).map(([priority, count]) => (
                 <div key={priority} className="flex items-center gap-3">
                   <div className={`w-3 h-3 rounded-full ${priorityColors[Number(priority)] || 'bg-gray-500'}`} />
                   <span className="flex-1">{priorityLabels[Number(priority)] || priority}</span>
@@ -148,7 +148,7 @@ const TicketStatistics = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {stats.by_type.map((item) => (
+              {(stats.by_type || []).map((item) => (
                 <div key={item.type_name} className="text-center p-4 border rounded-lg">
                   <div className="text-2xl font-bold">{item.count}</div>
                   <div className="text-sm text-muted-foreground">{item.type_name || '未分类'}</div>

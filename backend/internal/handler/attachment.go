@@ -20,7 +20,7 @@ func NewAttachmentHandler() *AttachmentHandler {
 // Upload 上传附件
 func (h *AttachmentHandler) Upload(c *gin.Context) {
 	ticketID, _ := strconv.ParseUint(c.Param("ticket_id"), 10, 32)
-	userID, _ := c.Get("userID")
+	userID, _ := c.Get("user_id")
 
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {

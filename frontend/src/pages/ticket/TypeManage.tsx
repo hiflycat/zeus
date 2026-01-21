@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Plus } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
@@ -9,7 +9,11 @@ import {
   createTicketType,
   updateTicketType,
   deleteTicketType,
+  getEnabledFormTemplates,
+  getEnabledApprovalFlows,
   TicketType,
+  FormTemplate,
+  ApprovalFlow,
 } from '@/api/ticket'
 import {
   Button,
@@ -33,12 +37,35 @@ import {
   Textarea,
   Label,
   Switch,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from '@/components/ui-tw'
+
+interface TypeFormData {
+  name: string
+  description: string
+  icon: string
+  template_id: number | null
+  flow_id: number | null
+  enabled: boolean
+}
 
 const TicketTypeManage = () => {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<TicketType | null>(null)
-  const [formData, setFormData] = useState({ name: '', description: '', icon: '', enabled: true })
+  const [formData, setFormData] = useState<TypeFormData>({
+    name: '',
+    description: '',
+    icon: '',
+    template_id: null,
+    flow_id: null,
+    enabled: true,
+  })
+  const [templates, setTemplates] = useState<FormTemplate[]>([])
+  const [flows, setFlows] = useState<ApprovalFlow[]>([])
   const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<TicketType>()
 
   const { data: types, loading, total, page, pageSize, handlePageChange, refresh } = usePagination<TicketType>({
@@ -46,15 +73,39 @@ const TicketTypeManage = () => {
     defaultPageSize: 10,
   })
 
+  useEffect(() => {
+    loadOptions()
+  }, [])
+
+  const loadOptions = async () => {
+    try {
+      const [templatesData, flowsData] = await Promise.all([
+        getEnabledFormTemplates(),
+        getEnabledApprovalFlows(),
+      ])
+      setTemplates(templatesData)
+      setFlows(flowsData)
+    } catch {
+      // ignore
+    }
+  }
+
   const handleCreate = () => {
     setEditing(null)
-    setFormData({ name: '', description: '', icon: '', enabled: true })
+    setFormData({ name: '', description: '', icon: '', template_id: null, flow_id: null, enabled: true })
     setDialogOpen(true)
   }
 
   const handleEdit = (type: TicketType) => {
     setEditing(type)
-    setFormData({ name: type.name, description: type.description || '', icon: type.icon || '', enabled: type.enabled })
+    setFormData({
+      name: type.name,
+      description: type.description || '',
+      icon: type.icon || '',
+      template_id: type.template_id || null,
+      flow_id: type.flow_id || null,
+      enabled: type.enabled,
+    })
     setDialogOpen(true)
   }
 
@@ -64,11 +115,19 @@ const TicketTypeManage = () => {
       return
     }
     try {
+      const payload: TicketType = {
+        name: formData.name,
+        description: formData.description,
+        icon: formData.icon,
+        template_id: formData.template_id || undefined,
+        flow_id: formData.flow_id || undefined,
+        enabled: formData.enabled,
+      }
       if (editing) {
-        await updateTicketType(editing.id!, formData as TicketType)
+        await updateTicketType(editing.id!, payload)
         toast.success('更新成功')
       } else {
-        await createTicketType(formData as TicketType)
+        await createTicketType(payload)
         toast.success('创建成功')
       }
       setDialogOpen(false)
@@ -89,6 +148,18 @@ const TicketTypeManage = () => {
     }
   }
 
+  const getTemplateName = (id?: number) => {
+    if (!id) return '-'
+    const t = templates.find((t) => t.id === id)
+    return t?.name || '-'
+  }
+
+  const getFlowName = (id?: number) => {
+    if (!id) return '-'
+    const f = flows.find((f) => f.id === id)
+    return f?.name || '-'
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -104,22 +175,24 @@ const TicketTypeManage = () => {
             <TableRow>
               <TableHead className="w-16">ID</TableHead>
               <TableHead>名称</TableHead>
-              <TableHead>描述</TableHead>
+              <TableHead>表单模板</TableHead>
+              <TableHead>审批流程</TableHead>
               <TableHead className="w-24">状态</TableHead>
               <TableHead className="w-32">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableEmpty colSpan={5} loading />
+              <TableEmpty colSpan={6} loading />
             ) : types.length === 0 ? (
-              <TableEmpty colSpan={5} />
+              <TableEmpty colSpan={6} />
             ) : (
               types.map((type) => (
                 <TableRow key={type.id}>
                   <TableCell className="font-medium">{type.id}</TableCell>
                   <TableCell>{type.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{type.description || '-'}</TableCell>
+                  <TableCell className="text-muted-foreground">{getTemplateName(type.template_id)}</TableCell>
+                  <TableCell className="text-muted-foreground">{getFlowName(type.flow_id)}</TableCell>
                   <TableCell>
                     <Badge variant={type.enabled ? 'default' : 'secondary'}>
                       {type.enabled ? '启用' : '禁用'}
@@ -170,6 +243,40 @@ const TicketTypeManage = () => {
             <div className="space-y-2">
               <Label>描述</Label>
               <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="请输入描述" />
+            </div>
+            <div className="space-y-2">
+              <Label>表单模板</Label>
+              <Select
+                value={formData.template_id?.toString() || 'none'}
+                onValueChange={(v) => setFormData({ ...formData, template_id: v === 'none' ? null : parseInt(v) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择表单模板" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">不使用模板</SelectItem>
+                  {templates.filter(t => t.id != null && t.id !== 0).map((t) => (
+                    <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>审批流程</Label>
+              <Select
+                value={formData.flow_id?.toString() || 'none'}
+                onValueChange={(v) => setFormData({ ...formData, flow_id: v === 'none' ? null : parseInt(v) })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="选择审批流程" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">不需要审批</SelectItem>
+                  {flows.filter(f => f.id != null && f.id !== 0).map((f) => (
+                    <SelectItem key={f.id} value={String(f.id)}>{f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center justify-between">
               <Label>启用</Label>

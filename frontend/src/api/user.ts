@@ -30,6 +30,9 @@ export const getUserList = (params: UserListParams): Promise<UserListResponse> =
   return request.get('/users', { params })
 }
 
+// 获取用户列表（别名，兼容）
+export const getUsers = getUserList
+
 // 获取用户详情
 export const getUserById = (id: number): Promise<User> => {
   return request.get(`/users/${id}`)

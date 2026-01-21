@@ -145,6 +145,21 @@ func SetupRouter() *gin.Engine {
 				systemConfig.PUT("/notify", systemConfigHandler.UpdateNotifyConfig)
 			}
 
+			// 表单模板管理
+			formTemplateHandler := handler.NewFormTemplateHandler()
+			formTemplate := auth.Group("/form-templates")
+			formTemplate.Use(middleware.CasbinRBACMiddleware())
+			{
+				formTemplate.GET("", formTemplateHandler.List)
+				formTemplate.GET("/enabled", formTemplateHandler.ListEnabled)
+				formTemplate.GET("/:id", formTemplateHandler.GetByID)
+				formTemplate.POST("", formTemplateHandler.Create)
+				formTemplate.PUT("/:id", formTemplateHandler.Update)
+				formTemplate.DELETE("/:id", formTemplateHandler.Delete)
+				formTemplate.GET("/:id/fields", formTemplateHandler.GetFields)
+				formTemplate.PUT("/:id/fields", formTemplateHandler.SaveFields)
+			}
+
 			// 工单类型管理
 			ticketTypeHandler := handler.NewTicketTypeHandler()
 			ticketType := auth.Group("/ticket-types")
@@ -158,6 +173,14 @@ func SetupRouter() *gin.Engine {
 				ticketType.DELETE("/:id", ticketTypeHandler.Delete)
 			}
 
+			// 工单快捷模板管理
+			templateHandler := handler.NewTemplateHandler()
+			template := auth.Group("/ticket-templates")
+			template.Use(middleware.CasbinRBACMiddleware())
+			{
+				template.GET("/enabled", templateHandler.ListEnabled)
+			}
+
 			// 工单管理
 			ticketHandler := handler.NewTicketHandler()
 			ticket := auth.Group("/tickets")
@@ -166,8 +189,12 @@ func SetupRouter() *gin.Engine {
 				ticket.GET("", ticketHandler.List)
 				ticket.GET("/my", ticketHandler.GetMyTickets)
 				ticket.GET("/pending", ticketHandler.GetPendingApprovals)
+				ticket.GET("/processed", ticketHandler.GetProcessedTickets)
+				ticket.GET("/cc", ticketHandler.GetCCTickets)
 				ticket.GET("/stats", handler.NewTicketStatsHandler().GetStats)
 				ticket.GET("/:id", ticketHandler.GetByID)
+				ticket.GET("/:id/records", ticketHandler.GetApprovalRecords)
+				ticket.GET("/:id/can-approve", ticketHandler.CanApprove)
 				ticket.POST("", ticketHandler.Create)
 				ticket.PUT("/:id", ticketHandler.Update)
 				ticket.DELETE("/:id", ticketHandler.Delete)
@@ -177,19 +204,31 @@ func SetupRouter() *gin.Engine {
 				ticket.POST("/:id/cancel", ticketHandler.Cancel)
 			}
 
+			// 工单评论
+			commentHandler := handler.NewCommentHandler()
+			comments := auth.Group("/comments")
+			comments.Use(middleware.CasbinRBACMiddleware())
+			{
+				comments.GET("/ticket/:ticket_id", commentHandler.List)
+				comments.POST("/ticket/:ticket_id", commentHandler.Create)
+				comments.DELETE("/:id", commentHandler.Delete)
+			}
+
 			// 审批流程管理
 			approvalFlowHandler := handler.NewApprovalFlowHandler()
 			approvalFlow := auth.Group("/approval-flows")
 			approvalFlow.Use(middleware.CasbinRBACMiddleware())
 			{
 				approvalFlow.GET("", approvalFlowHandler.ListFlows)
+				approvalFlow.GET("/enabled", approvalFlowHandler.ListEnabledFlows)
 				approvalFlow.GET("/:id", approvalFlowHandler.GetFlowByID)
-				approvalFlow.GET("/type/:type_id", approvalFlowHandler.GetFlowByTypeID)
 				approvalFlow.POST("", approvalFlowHandler.CreateFlow)
 				approvalFlow.PUT("/:id", approvalFlowHandler.UpdateFlow)
 				approvalFlow.DELETE("/:id", approvalFlowHandler.DeleteFlow)
+				approvalFlow.POST("/:id/publish", approvalFlowHandler.PublishFlow)
 				approvalFlow.GET("/:id/nodes", approvalFlowHandler.GetNodes)
 				approvalFlow.PUT("/:id/nodes", approvalFlowHandler.SaveNodes)
+				approvalFlow.PUT("/:id/nodes-with-connections", approvalFlowHandler.SaveNodesWithConnections)
 			}
 
 			// 附件管理

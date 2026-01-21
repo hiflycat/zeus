@@ -83,6 +83,13 @@ func main() {
 	}
 	logger.Info("Casbin policies synced successfully")
 
+	// 同步普通工单用户权限
+	if err := migrations.SyncTicketUserPolicies(); err != nil {
+		logger.Error("Failed to sync ticket user policies", zap.Error(err))
+		os.Exit(1)
+	}
+	logger.Info("Ticket user policies synced successfully")
+
 	// 同步系统配置 - 每次启动都执行，检查并添加默认配置
 	if err := migrations.SyncSystemConfigs(); err != nil {
 		logger.Error("Failed to sync system configs", zap.Error(err))

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Plus, Trash2, GripVertical } from 'lucide-react'
+import { Plus, Trash2, GripVertical, Settings, Workflow } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
 import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import { usePagination } from '@/hooks/usePagination'
@@ -9,14 +9,19 @@ import {
   createApprovalFlow,
   updateApprovalFlow,
   deleteApprovalFlow,
-  getApprovalNodes,
-  saveApprovalNodes,
-  getEnabledTicketTypes,
+  getFlowNodes,
+  saveFlowNodes,
+  saveFlowNodesWithConnections,
+  publishApprovalFlow,
   ApprovalFlow,
-  ApprovalNode,
-  TicketType,
+  FlowNode,
+  NodeConnection,
+  FLOW_NODE_TYPES,
+  APPROVER_TYPES,
 } from '@/api/ticket'
 import { getRoleList, Role } from '@/api/role'
+import { getUsers, User } from '@/api/user'
+import FlowEditor from '@/components/ticket/FlowEditor'
 import {
   Button,
   Table,
@@ -36,6 +41,7 @@ import {
   DialogTitle,
   DialogFooter,
   Input,
+  Textarea,
   Label,
   Switch,
   Select,
@@ -45,16 +51,21 @@ import {
   SelectItem,
   Card,
   CardContent,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from '@/components/ui-tw'
 
 const FlowManage = () => {
-  const [ticketTypes, setTicketTypes] = useState<TicketType[]>([])
   const [roles, setRoles] = useState<Role[]>([])
+  const [users, setUsers] = useState<User[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [nodesDialogOpen, setNodesDialogOpen] = useState(false)
   const [editing, setEditing] = useState<ApprovalFlow | null>(null)
-  const [formData, setFormData] = useState({ type_id: '', name: '', enabled: true })
-  const [nodes, setNodes] = useState<ApprovalNode[]>([])
+  const [formData, setFormData] = useState({ name: '', description: '', enabled: true })
+  const [nodes, setNodes] = useState<FlowNode[]>([])
+  const [connections, setConnections] = useState<NodeConnection[]>([])
+  const [editorMode, setEditorMode] = useState<'list' | 'visual'>('list')
   const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<ApprovalFlow>()
 
   const { data: flows, loading, total, page, pageSize, handlePageChange, refresh } = usePagination<ApprovalFlow>({
@@ -63,34 +74,45 @@ const FlowManage = () => {
   })
 
   useEffect(() => {
-    getEnabledTicketTypes().then(setTicketTypes)
-    getRoleList({ page: 1, page_size: 1000 }).then((res) => setRoles(res.list || []))
+    loadOptions()
   }, [])
+
+  const loadOptions = async () => {
+    try {
+      const [rolesRes, usersRes] = await Promise.all([
+        getRoleList({ page: 1, page_size: 1000 }),
+        getUsers({ page: 1, page_size: 1000 }),
+      ])
+      setRoles(rolesRes.list || [])
+      setUsers(usersRes.list || [])
+    } catch {
+      // ignore
+    }
+  }
 
   const handleCreate = () => {
     setEditing(null)
-    setFormData({ type_id: '', name: '', enabled: true })
+    setFormData({ name: '', description: '', enabled: true })
     setDialogOpen(true)
   }
 
   const handleEdit = (flow: ApprovalFlow) => {
     setEditing(flow)
-    setFormData({ type_id: flow.type_id.toString(), name: flow.name, enabled: flow.enabled })
+    setFormData({ name: flow.name, description: flow.description || '', enabled: flow.enabled })
     setDialogOpen(true)
   }
 
   const handleSave = async () => {
-    if (!formData.type_id || !formData.name) {
-      toast.error('请填写必填项')
+    if (!formData.name) {
+      toast.error('请输入流程名称')
       return
     }
     try {
-      const data = { ...formData, type_id: parseInt(formData.type_id) } as ApprovalFlow
       if (editing) {
-        await updateApprovalFlow(editing.id!, data)
+        await updateApprovalFlow(editing.id!, formData)
         toast.success('更新成功')
       } else {
-        await createApprovalFlow(data)
+        await createApprovalFlow(formData)
         toast.success('创建成功')
       }
       setDialogOpen(false)
@@ -111,10 +133,20 @@ const FlowManage = () => {
     }
   }
 
+  const handlePublish = async (flow: ApprovalFlow) => {
+    try {
+      await publishApprovalFlow(flow.id!)
+      toast.success('发布成功')
+      refresh()
+    } catch {
+      toast.error('发布失败')
+    }
+  }
+
   const handleEditNodes = async (flow: ApprovalFlow) => {
     setEditing(flow)
     try {
-      const data = await getApprovalNodes(flow.id!)
+      const data = await getFlowNodes(flow.id!)
       setNodes(data)
     } catch {
       setNodes([])
@@ -123,7 +155,25 @@ const FlowManage = () => {
   }
 
   const handleAddNode = () => {
-    setNodes([...nodes, { flow_id: editing!.id!, name: '', role_id: 0, approve_type: 'or', sort_order: nodes.length + 1 }])
+    setNodes([
+      ...nodes,
+      {
+        flow_id: editing!.id!,
+        node_type: 'approve',
+        name: '',
+        approver_type: 'role',
+        approver_value: '',
+        sort_order: nodes.length + 1,
+        position_x: 0,
+        position_y: 0,
+      },
+    ])
+  }
+
+  const handleNodeChange = (index: number, key: keyof FlowNode, value: any) => {
+    const newNodes = [...nodes]
+    newNodes[index] = { ...newNodes[index], [key]: value }
+    setNodes(newNodes)
   }
 
   const handleRemoveNode = (index: number) => {
@@ -132,14 +182,34 @@ const FlowManage = () => {
 
   const handleSaveNodes = async () => {
     if (!editing) return
+    // 验证节点
+    for (const node of nodes) {
+      if (!node.name) {
+        toast.error('请填写所有节点名称')
+        return
+      }
+      if (node.node_type !== 'condition' && node.node_type !== 'cc' && !node.approver_value) {
+        toast.error('请为所有审批节点配置审批人')
+        return
+      }
+    }
     try {
-      await saveApprovalNodes(editing.id!, nodes)
+      if (editorMode === 'visual' && connections.length > 0) {
+        await saveFlowNodesWithConnections(editing.id!, { nodes, connections })
+      } else {
+        await saveFlowNodes(editing.id!, nodes)
+      }
       toast.success('保存成功')
       setNodesDialogOpen(false)
     } catch {
       toast.error('保存失败')
     }
   }
+
+  const handleFlowEditorChange = useCallback((newNodes: FlowNode[], newConnections: NodeConnection[]) => {
+    setNodes(newNodes)
+    setConnections(newConnections)
+  }, [])
 
   return (
     <div className="space-y-4">
@@ -154,28 +224,31 @@ const FlowManage = () => {
             <TableRow>
               <TableHead className="w-16">ID</TableHead>
               <TableHead>名称</TableHead>
-              <TableHead>关联类型</TableHead>
+              <TableHead>描述</TableHead>
+              <TableHead className="w-20">版本</TableHead>
               <TableHead className="w-24">状态</TableHead>
-              <TableHead className="w-40">操作</TableHead>
+              <TableHead className="w-48">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
-              <TableEmpty colSpan={5} loading />
+              <TableEmpty colSpan={6} loading />
             ) : flows.length === 0 ? (
-              <TableEmpty colSpan={5} />
+              <TableEmpty colSpan={6} />
             ) : (
               flows.map((flow) => (
                 <TableRow key={flow.id}>
                   <TableCell className="font-medium">{flow.id}</TableCell>
                   <TableCell>{flow.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{ticketTypes.find((t) => t.id === flow.type_id)?.name || flow.type_id}</TableCell>
+                  <TableCell className="text-muted-foreground">{flow.description || '-'}</TableCell>
+                  <TableCell>v{flow.version}</TableCell>
                   <TableCell><Badge variant={flow.enabled ? 'default' : 'secondary'}>{flow.enabled ? '启用' : '禁用'}</Badge></TableCell>
                   <TableCell>
                     <div className="relative">
                       <TableActions>
-                        <TableActionButton onClick={() => handleEditNodes(flow)}>节点</TableActionButton>
+                        <TableActionButton variant="settings" icon={<Settings className="h-4 w-4" />} onClick={() => handleEditNodes(flow)} title="配置节点" />
                         <TableActionButton variant="edit" onClick={() => handleEdit(flow)} />
+                        <TableActionButton onClick={() => handlePublish(flow)}>发布</TableActionButton>
                         <TableActionButton
                           variant="delete"
                           ref={(el) => setButtonRef(flow.id!, el)}
@@ -204,6 +277,7 @@ const FlowManage = () => {
         />
       </div>
 
+      {/* 新建/编辑流程对话框 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader><DialogTitle>{editing ? '编辑审批流程' : '新建审批流程'}</DialogTitle></DialogHeader>
@@ -213,13 +287,8 @@ const FlowManage = () => {
               <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="请输入流程名称" />
             </div>
             <div className="space-y-2">
-              <Label>关联工单类型 *</Label>
-              <Select value={formData.type_id} onValueChange={(v) => setFormData({ ...formData, type_id: v })}>
-                <SelectTrigger><SelectValue placeholder="选择工单类型" /></SelectTrigger>
-                <SelectContent>
-                  {ticketTypes.map((type) => (<SelectItem key={type.id} value={type.id!.toString()}>{type.name}</SelectItem>))}
-                </SelectContent>
-              </Select>
+              <Label>描述</Label>
+              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="请输入描述" />
             </div>
             <div className="flex items-center justify-between">
               <Label>启用</Label>
@@ -233,57 +302,148 @@ const FlowManage = () => {
         </DialogContent>
       </Dialog>
 
+      {/* 节点配置对话框 */}
       <Dialog open={nodesDialogOpen} onOpenChange={setNodesDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle>编辑审批节点 - {editing?.name}</DialogTitle></DialogHeader>
-          <div className="space-y-4 max-h-96 overflow-y-auto">
-            {nodes.map((node, index) => (
-              <Card key={index}>
-                <CardContent className="pt-4">
-                  <div className="flex items-center gap-4">
-                    <GripVertical className="h-4 w-4 text-muted-foreground" />
-                    <div className="flex-1 grid grid-cols-3 gap-4">
-                      <Input placeholder="节点名称" value={node.name} onChange={(e) => {
-                        const newNodes = [...nodes]
-                        newNodes[index].name = e.target.value
-                        setNodes(newNodes)
-                      }} />
-                      <Select value={node.role_id?.toString() || ''} onValueChange={(v) => {
-                        const newNodes = [...nodes]
-                        newNodes[index].role_id = parseInt(v)
-                        setNodes(newNodes)
-                      }}>
-                        <SelectTrigger><SelectValue placeholder="审批角色" /></SelectTrigger>
-                        <SelectContent>
-                          {roles.map((role) => (<SelectItem key={role.id} value={role.id!.toString()}>{role.name}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
-                      <Select value={node.approve_type} onValueChange={(v) => {
-                        const newNodes = [...nodes]
-                        newNodes[index].approve_type = v
-                        setNodes(newNodes)
-                      }}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="or">或签</SelectItem>
-                          <SelectItem value="and">会签</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleRemoveNode(index)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-            <Button variant="outline" className="w-full" onClick={handleAddNode}>
-              <Plus className="h-4 w-4 mr-2" />添加节点
-            </Button>
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle>配置审批节点 - {editing?.name}</DialogTitle>
+              <Tabs value={editorMode} onValueChange={(v) => setEditorMode(v as 'list' | 'visual')}>
+                <TabsList>
+                  <TabsTrigger value="list">
+                    <GripVertical className="h-4 w-4 mr-1" />列表模式
+                  </TabsTrigger>
+                  <TabsTrigger value="visual">
+                    <Workflow className="h-4 w-4 mr-1" />可视化
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto">
+            {editorMode === 'visual' ? (
+              <FlowEditor
+                nodes={nodes}
+                roles={roles.map((r) => ({ id: r.id!, name: r.name }))}
+                users={users.map((u) => ({ id: u.id!, username: u.username }))}
+                onChange={handleFlowEditorChange}
+              />
+            ) : (
+              <div className="space-y-4 p-1">
+                {nodes.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">暂无节点，请点击下方按钮添加</div>
+                ) : (
+                  nodes.map((node, index) => (
+                    <Card key={index}>
+                      <CardContent className="pt-4">
+                        <div className="flex items-start gap-4">
+                          <GripVertical className="h-4 w-4 text-muted-foreground mt-2 cursor-move" />
+                          <div className="flex-1 space-y-3">
+                            <div className="grid grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-xs">节点名称 *</Label>
+                                <Input
+                                  placeholder="节点名称"
+                                  value={node.name}
+                                  onChange={(e) => handleNodeChange(index, 'name', e.target.value)}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">节点类型</Label>
+                                <Select
+                                  value={node.node_type}
+                                  onValueChange={(v) => handleNodeChange(index, 'node_type', v)}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {Object.entries(FLOW_NODE_TYPES).map(([key, label]) => (
+                                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">审批人类型</Label>
+                                <Select
+                                  value={node.approver_type || 'role'}
+                                  onValueChange={(v) => handleNodeChange(index, 'approver_type', v)}
+                                  disabled={node.node_type === 'condition' || node.node_type === 'cc'}
+                                >
+                                  <SelectTrigger><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {Object.entries(APPROVER_TYPES).map(([key, label]) => (
+                                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">审批人/值</Label>
+                              {node.approver_type === 'role' ? (
+                                <Select
+                                  value={node.approver_value || 'none'}
+                                  onValueChange={(v) => handleNodeChange(index, 'approver_value', v === 'none' ? '' : v)}
+                                >
+                                  <SelectTrigger><SelectValue placeholder="选择角色" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">请选择</SelectItem>
+                                    {roles.filter(r => r.id != null && r.id !== 0).map((role) => (
+                                      <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : node.approver_type === 'user' ? (
+                                <Select
+                                  value={node.approver_value || 'none'}
+                                  onValueChange={(v) => handleNodeChange(index, 'approver_value', v === 'none' ? '' : v)}
+                                >
+                                  <SelectTrigger><SelectValue placeholder="选择用户" /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="none">请选择</SelectItem>
+                                    {users.filter(u => u.id != null && u.id !== 0).map((user) => (
+                                      <SelectItem key={user.id} value={String(user.id)}>{user.username}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <Input
+                                  placeholder="输入表单字段名"
+                                  value={node.approver_value || ''}
+                                  onChange={(e) => handleNodeChange(index, 'approver_value', e.target.value)}
+                                />
+                              )}
+                            </div>
+                            {node.node_type === 'condition' && (
+                              <div className="space-y-1">
+                                <Label className="text-xs">条件配置 (JSON)</Label>
+                                <Input
+                                  placeholder='{"field": "amount", "operator": ">", "value": "1000"}'
+                                  value={node.condition || ''}
+                                  onChange={(e) => handleNodeChange(index, 'condition', e.target.value)}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <Button variant="ghost" size="icon" onClick={() => handleRemoveNode(index)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+                <Button variant="outline" className="w-full" onClick={handleAddNode}>
+                  <Plus className="h-4 w-4 mr-2" />添加节点
+                </Button>
+              </div>
+            )}
           </div>
-          <DialogFooter>
+
+          <DialogFooter className="border-t pt-4">
             <Button variant="outline" onClick={() => setNodesDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSaveNodes}>保存</Button>
+            <Button onClick={handleSaveNodes}>保存节点</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

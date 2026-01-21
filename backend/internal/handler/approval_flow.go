@@ -64,25 +64,25 @@ func (h *ApprovalFlowHandler) GetFlowByID(c *gin.Context) {
 	response.Success(c, flow)
 }
 
-func (h *ApprovalFlowHandler) GetFlowByTypeID(c *gin.Context) {
-	typeID, _ := strconv.ParseUint(c.Param("type_id"), 10, 32)
-	flow, err := h.svc.GetFlowByTypeID(uint(typeID))
-	if err != nil {
-		response.NotFound(c, "该工单类型没有配置审批流程")
-		return
-	}
-	response.Success(c, flow)
-}
-
 func (h *ApprovalFlowHandler) ListFlows(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	flows, total, err := h.svc.ListFlows(page, pageSize)
+	keyword := c.Query("keyword")
+	flows, total, err := h.svc.ListFlows(page, pageSize, keyword)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
 	response.Success(c, gin.H{"list": flows, "total": total, "page": page, "page_size": pageSize})
+}
+
+func (h *ApprovalFlowHandler) ListEnabledFlows(c *gin.Context) {
+	flows, err := h.svc.ListEnabledFlows()
+	if err != nil {
+		response.InternalError(c, err.Error())
+		return
+	}
+	response.Success(c, flows)
 }
 
 func (h *ApprovalFlowHandler) GetNodes(c *gin.Context) {
@@ -97,12 +97,40 @@ func (h *ApprovalFlowHandler) GetNodes(c *gin.Context) {
 
 func (h *ApprovalFlowHandler) SaveNodes(c *gin.Context) {
 	flowID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var nodes []model.ApprovalNode
+	var nodes []model.FlowNode
 	if err := c.ShouldBindJSON(&nodes); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 	if err := h.svc.SaveNodes(uint(flowID), nodes); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+// SaveNodesWithConnections 保存节点及连线（用于可视化编辑器）
+func (h *ApprovalFlowHandler) SaveNodesWithConnections(c *gin.Context) {
+	flowID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	var req struct {
+		Nodes       []model.FlowNode             `json:"nodes"`
+		Connections []service.NodeConnection     `json:"connections"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	if err := h.svc.SaveNodesWithConnections(uint(flowID), req.Nodes, req.Connections); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+// PublishFlow 发布新版本
+func (h *ApprovalFlowHandler) PublishFlow(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err := h.svc.PublishFlow(uint(id)); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}

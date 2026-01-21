@@ -7,6 +7,10 @@ import { useDeleteConfirm } from '@/hooks/useDeleteConfirm'
 import { usePagination } from '@/hooks/usePagination'
 import {
   getTickets,
+  getMyTickets,
+  getPendingApprovals,
+  getProcessedTickets,
+  getCCTickets,
   getEnabledTicketTypes,
   deleteTicket,
   Ticket,
@@ -32,6 +36,10 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
 } from '@/components/ui-tw'
 
 const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
@@ -56,7 +64,28 @@ const TicketList = () => {
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [typeFilter, setTypeFilter] = useState<string>('')
+  const [activeTab, setActiveTab] = useState<string>('all')
   const { deletingId, handleDeleteClick, handleDeleteCancel, setButtonRef, getButtonRef, resetDeleting } = useDeleteConfirm<Ticket>()
+
+  const fetchFn = async (params: any) => {
+    const queryParams: TicketListParams = {
+      ...params,
+      status: statusFilter || undefined,
+      type_id: typeFilter ? parseInt(typeFilter) : undefined,
+    }
+    switch (activeTab) {
+      case 'my':
+        return await getMyTickets(queryParams)
+      case 'pending':
+        return await getPendingApprovals(queryParams)
+      case 'processed':
+        return await getProcessedTickets(queryParams)
+      case 'cc':
+        return await getCCTickets(queryParams)
+      default:
+        return await getTickets(queryParams)
+    }
+  }
 
   const {
     data: tickets,
@@ -70,14 +99,7 @@ const TicketList = () => {
     handleSearchSubmit,
     refresh,
   } = usePagination<Ticket>({
-    fetchFn: async (params) => {
-      const queryParams: TicketListParams = {
-        ...params,
-        status: statusFilter || undefined,
-        type_id: typeFilter ? parseInt(typeFilter) : undefined,
-      }
-      return await getTickets(queryParams)
-    },
+    fetchFn,
     defaultPageSize: 10,
   })
 
@@ -87,14 +109,15 @@ const TicketList = () => {
 
   useEffect(() => {
     refresh()
-  }, [statusFilter, typeFilter])
+  }, [statusFilter, typeFilter, activeTab])
 
   const handleCreate = () => {
     navigate('/ticket/create')
   }
 
   const handleView = (ticket: Ticket) => {
-    navigate(`/ticket/${ticket.id}`)
+    if (!ticket.id) return
+    navigate(`/ticket/${ticket.id}`, { state: { tabTitle: ticket.title || '工单详情' } })
   }
 
   const handleDeleteConfirm = async (ticket: Ticket) => {
@@ -108,61 +131,19 @@ const TicketList = () => {
     }
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
-            <Input
-              placeholder="搜索工单标题..."
-              value={searchKeyword}
-              onChange={(e) => handleSearch(e.target.value)}
-              className="w-64"
-            />
-            <Button type="submit" variant="outline" size="icon">
-              <Search className="h-4 w-4" />
-            </Button>
-          </form>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="状态筛选" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">全部状态</SelectItem>
-              {Object.entries(statusMap).map(([key, { label }]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-32">
-              <SelectValue placeholder="类型筛选" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">全部类型</SelectItem>
-              {ticketTypes.map((type) => (
-                <SelectItem key={type.id} value={type.id!.toString()}>{type.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button onClick={handleCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          创建工单
-        </Button>
-      </div>
-
-      <Table>
+  const renderTable = () => (
+    <div className="rounded-lg border bg-card">
+      <Table className="text-sm">
         <TableHeader>
           <TableRow>
-            <TableHead>ID</TableHead>
+            <TableHead className="w-16">ID</TableHead>
             <TableHead>标题</TableHead>
-            <TableHead>类型</TableHead>
-            <TableHead>优先级</TableHead>
-            <TableHead>状态</TableHead>
-            <TableHead>创建人</TableHead>
-            <TableHead>创建时间</TableHead>
-            <TableHead className="text-right">操作</TableHead>
+            <TableHead className="w-24">类型</TableHead>
+            <TableHead className="w-20">优先级</TableHead>
+            <TableHead className="w-24">状态</TableHead>
+            <TableHead className="w-24">创建人</TableHead>
+            <TableHead className="w-40">创建时间</TableHead>
+            <TableHead className="w-24 text-right">操作</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -175,8 +156,16 @@ const TicketList = () => {
           ) : (
             tickets.map((ticket) => (
               <TableRow key={ticket.id}>
-                <TableCell>#{ticket.id}</TableCell>
-                <TableCell className="font-medium">{ticket.title}</TableCell>
+                <TableCell className="font-mono text-muted-foreground">#{ticket.id}</TableCell>
+                <TableCell className="font-medium max-w-xs truncate">
+                  <button
+                    type="button"
+                    className="text-left hover:text-primary transition-colors"
+                    onClick={() => handleView(ticket)}
+                  >
+                    {ticket.title}
+                  </button>
+                </TableCell>
                 <TableCell>{ticket.type?.name || '-'}</TableCell>
                 <TableCell>
                   <span className={priorityMap[ticket.priority]?.color || ''}>
@@ -189,40 +178,128 @@ const TicketList = () => {
                   </Badge>
                 </TableCell>
                 <TableCell>{ticket.creator?.username || '-'}</TableCell>
-                <TableCell>{ticket.created_at ? new Date(ticket.created_at).toLocaleString() : '-'}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {ticket.created_at ? new Date(ticket.created_at).toLocaleString() : '-'}
+                </TableCell>
                 <TableCell className="text-right">
-                  <TableActions>
-                    <TableActionButton onClick={() => handleView(ticket)}>
-                      <Eye className="h-4 w-4" />
-                    </TableActionButton>
-                    <TableActionButton
-                      variant="delete"
-                      ref={(el) => setButtonRef(ticket.id!, el)}
-                      onClick={() => handleDeleteClick(ticket)}
+                  <div className="relative">
+                    <TableActions>
+                      <Button variant="ghost" size="sm" onClick={() => handleView(ticket)}>
+                        <Eye className="h-4 w-4 mr-1" />
+                        查看
+                      </Button>
+                      {(ticket.status === 'draft' || ticket.status === 'cancelled') && (
+                        <TableActionButton
+                          variant="delete"
+                          ref={(el) => setButtonRef(ticket.id!, el)}
+                          onClick={() => handleDeleteClick(ticket)}
+                        />
+                      )}
+                    </TableActions>
+                    <DeleteConfirmCard
+                      isOpen={deletingId === ticket.id}
+                      message={`确定要删除工单 "${ticket.title}" 吗？`}
+                      buttonRef={getButtonRef(ticket.id!)}
+                      onConfirm={() => handleDeleteConfirm(ticket)}
+                      onCancel={handleDeleteCancel}
                     />
-                  </TableActions>
-                  <DeleteConfirmCard
-                    isOpen={deletingId === ticket.id}
-                    message={`确定要删除工单 "${ticket.title}" 吗？`}
-                    buttonRef={getButtonRef(ticket.id!)}
-                    onConfirm={() => handleDeleteConfirm(ticket)}
-                    onCancel={handleDeleteCancel}
-                  />
+                  </div>
                 </TableCell>
               </TableRow>
             ))
           )}
         </TableBody>
       </Table>
+      <Pagination
+        current={page}
+        total={total}
+        pageSize={pageSize}
+        onChange={handlePageChange}
+      />
+    </div>
+  )
 
-      {total > pageSize && (
-        <Pagination
-          current={page}
-          total={total}
-          pageSize={pageSize}
-          onChange={handlePageChange}
-        />
-      )}
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold">工单列表</h1>
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          创建工单
+        </Button>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <div className="flex items-center justify-between">
+          <TabsList>
+            <TabsTrigger value="all">全部工单</TabsTrigger>
+            <TabsTrigger value="my">我创建的</TabsTrigger>
+            <TabsTrigger value="pending">待我审批</TabsTrigger>
+            <TabsTrigger value="processed">我已处理</TabsTrigger>
+            <TabsTrigger value="cc">抄送我的</TabsTrigger>
+          </TabsList>
+
+          <div className="flex items-center gap-4">
+            <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
+              <Input
+                placeholder="搜索工单标题..."
+                value={searchKeyword}
+                onChange={(e) => handleSearch(e.target.value)}
+                className="w-64"
+              />
+              <Button type="submit" variant="outline" size="icon">
+                <Search className="h-4 w-4" />
+              </Button>
+            </form>
+            {activeTab === 'all' && (
+              <>
+                <Select value={statusFilter || '__all__'} onValueChange={(v) => setStatusFilter(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="状态筛选" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">全部状态</SelectItem>
+                    {Object.entries(statusMap).map(([key, { label }]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={typeFilter || '__all__'} onValueChange={(v) => setTypeFilter(v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="类型筛选" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">全部类型</SelectItem>
+                    {ticketTypes.filter(t => t.id != null && t.id !== 0).map((type) => (
+                      <SelectItem key={type.id} value={String(type.id)}>{type.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+          </div>
+        </div>
+
+        <TabsContent value="all" className="mt-4">
+          {renderTable()}
+        </TabsContent>
+
+        <TabsContent value="my" className="mt-4">
+          {renderTable()}
+        </TabsContent>
+
+        <TabsContent value="pending" className="mt-4">
+          {renderTable()}
+        </TabsContent>
+
+        <TabsContent value="processed" className="mt-4">
+          {renderTable()}
+        </TabsContent>
+
+        <TabsContent value="cc" className="mt-4">
+          {renderTable()}
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

@@ -7,6 +7,7 @@ interface TabsState {
   addTab: (tab: TabItem) => void
   removeTab: (key: string) => string | undefined
   setActiveKey: (key: string) => void
+  updateTabTitle: (key: string, title: string) => void
   clearTabs: () => void
 }
 
@@ -40,18 +41,20 @@ export const useTabsStore = create<TabsState>((set, get) => ({
 
   removeTab: (key: string) => {
     const { tabs, activeKey } = get()
+    const normalizeKey = (value: string) => (value.endsWith('/') && value.length > 1 ? value.replace(/\/+$/, '') : value)
+    const targetKey = normalizeKey(key)
     
     // 如果尝试关闭首页，不允许关闭
-    if (key === '/dashboard') {
+    if (targetKey === '/dashboard') {
       return activeKey
     }
     
-    const newTabs = tabs.filter((tab) => tab.key !== key)
+    const newTabs = tabs.filter((tab) => normalizeKey(tab.key) !== targetKey)
     
     // 如果关闭的是当前激活的标签，需要切换到其他标签
     let newActiveKey = activeKey
-    if (activeKey === key && newTabs.length > 0) {
-      const currentIndex = tabs.findIndex((tab) => tab.key === key)
+    if (normalizeKey(activeKey) === targetKey && newTabs.length > 0) {
+      const currentIndex = tabs.findIndex((tab) => normalizeKey(tab.key) === targetKey)
       // 优先切换到右侧的标签，如果没有则切换到左侧
       if (currentIndex < tabs.length - 1) {
         newActiveKey = tabs[currentIndex + 1].key
@@ -61,7 +64,7 @@ export const useTabsStore = create<TabsState>((set, get) => ({
         // 如果没有其他标签，默认切换到首页
         newActiveKey = '/dashboard'
       }
-    } else if (activeKey === key && newTabs.length === 0) {
+    } else if (normalizeKey(activeKey) === targetKey && newTabs.length === 0) {
       // 如果关闭后没有标签了，切换到首页
       newActiveKey = '/dashboard'
     }
@@ -81,6 +84,13 @@ export const useTabsStore = create<TabsState>((set, get) => ({
   setActiveKey: (key: string) => {
     set({ activeKey: key })
     tabsStorage.setActiveKey(key)
+  },
+
+  updateTabTitle: (key: string, title: string) => {
+    const { tabs } = get()
+    const newTabs = tabs.map((tab) => (tab.key === key ? { ...tab, title } : tab))
+    set({ tabs: newTabs })
+    tabsStorage.set(newTabs)
   },
 
   clearTabs: () => {

@@ -49,7 +49,7 @@ const Layout = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, menus, logout, fetchMenus, fetchUserInfo, isAuthenticated, currentRoleId, setCurrentRole } = useAuthStore()
-  const { tabs, activeKey, addTab, removeTab, setActiveKey, clearTabs } = useTabsStore()
+  const { tabs, activeKey, addTab, removeTab, setActiveKey, updateTabTitle, clearTabs } = useTabsStore()
   const { theme, toggleTheme } = useThemeStore()
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -83,6 +83,8 @@ const Layout = () => {
 
   // 根据路径获取标签标题（支持国际化）
   const getTabTitle = (path: string): string => {
+    const tab = tabs.find((t) => t.path === path)
+    if (tab?.title) return tab.title
     if (path === '/dashboard') {
       return t('menu.dashboard')
     }
@@ -164,9 +166,15 @@ const Layout = () => {
       if (isParent) return
 
       const existingTab = tabs.find((tab) => tab.key === location.pathname)
+      const state = (location.state || {}) as { tabTitle?: string; closedTabKey?: string }
+      if (state.closedTabKey) {
+        closedTabKeyRef.current = state.closedTabKey
+      }
+      const desiredTitle = state.tabTitle || ''
       if (!existingTab) {
-      // title 不再使用，显示时会通过 getTabTitle 动态翻译
-        addTab({ key: location.pathname, path: location.pathname, title: '', closable: location.pathname !== '/dashboard' })
+        addTab({ key: location.pathname, path: location.pathname, title: desiredTitle, closable: location.pathname !== '/dashboard' })
+      } else if (desiredTitle && existingTab.title !== desiredTitle) {
+        updateTabTitle(existingTab.key, desiredTitle)
       } else if (activeKey !== location.pathname) {
         setActiveKey(location.pathname)
       }

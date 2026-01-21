@@ -1,11 +1,13 @@
 package migrations
 
 import (
+	"errors"
 	"strconv"
 
 	casbinPkg "backend/internal/casbin"
 	"backend/internal/model"
 	"backend/pkg/utils"
+	"gorm.io/gorm"
 )
 
 // Seed 初始化基础数据（只在首次启动时执行）
@@ -30,86 +32,6 @@ func Seed() error {
 		return err
 	}
 
-	// 创建仪表盘菜单
-	dashboardMenu := model.Menu{
-		Name:      "仪表盘",
-		Path:      "/dashboard",
-		Icon:      "DashboardOutlined",
-		Component: "dashboard",
-		Sort:      1,
-		Status:    1,
-	}
-	if err := db.Where("path = ?", "/dashboard").FirstOrCreate(&dashboardMenu).Error; err != nil {
-		return err
-	}
-
-	// 创建系统管理菜单
-	systemMenu := model.Menu{
-		Name:      "系统管理",
-		Path:      "/system",
-		Icon:      "SettingOutlined",
-		Component: "",
-		Sort:      2,
-		Status:    1,
-	}
-	if err := db.Where("path = ?", "/system").FirstOrCreate(&systemMenu).Error; err != nil {
-		return err
-	}
-
-	// 创建子菜单
-	subMenus := []model.Menu{
-		{Name: "导航管理", Path: "/system/navigation", Icon: "AppstoreOutlined", Component: "system/navigation", Sort: 1, Status: 1},
-		{Name: "用户管理", Path: "/system/user", Icon: "UserOutlined", Component: "system/user", Sort: 2, Status: 1},
-		{Name: "角色管理", Path: "/system/role", Icon: "TeamOutlined", Component: "system/role", Sort: 3, Status: 1},
-		{Name: "API 管理", Path: "/system/api", Icon: "ApiOutlined", Component: "system/api", Sort: 4, Status: 1},
-		{Name: "菜单管理", Path: "/system/menu", Icon: "MenuOutlined", Component: "system/menu", Sort: 5, Status: 1},
-		{Name: "系统设置", Path: "/system/settings", Icon: "SettingOutlined", Component: "system/settings", Sort: 6, Status: 1},
-	}
-
-	for i := range subMenus {
-		subMenus[i].ParentID = &systemMenu.ID
-		if err := db.Where("path = ?", subMenus[i].Path).FirstOrCreate(&subMenus[i]).Error; err != nil {
-			return err
-		}
-	}
-
-	// 创建 SSO 管理菜单
-	ssoMenu := model.Menu{
-		Name:      "SSO 管理",
-		Path:      "/sso",
-		Icon:      "KeyOutlined",
-		Component: "",
-		Sort:      3,
-		Status:    1,
-	}
-	if err := db.Where("path = ?", "/sso").FirstOrCreate(&ssoMenu).Error; err != nil {
-		return err
-	}
-
-	// 创建 SSO 子菜单
-	ssoSubMenus := []model.Menu{
-		{Name: "租户管理", Path: "/sso/tenants", Icon: "TeamOutlined", Component: "sso/TenantManage", Sort: 1, Status: 1},
-		{Name: "应用管理", Path: "/sso/clients", Icon: "AppstoreOutlined", Component: "sso/ClientManage", Sort: 2, Status: 1},
-		{Name: "用户管理", Path: "/sso/users", Icon: "UserOutlined", Component: "sso/UserManage", Sort: 3, Status: 1},
-		{Name: "用户组管理", Path: "/sso/groups", Icon: "TeamOutlined", Component: "sso/GroupManage", Sort: 4, Status: 1},
-	}
-
-	for i := range ssoSubMenus {
-		ssoSubMenus[i].ParentID = &ssoMenu.ID
-		if err := db.Where("path = ?", ssoSubMenus[i].Path).FirstOrCreate(&ssoSubMenus[i]).Error; err != nil {
-			return err
-		}
-	}
-
-	// 将所有菜单分配给超级管理员角色
-	var allMenus []model.Menu
-	if err := db.Find(&allMenus).Error; err != nil {
-		return err
-	}
-	if err := db.Model(&superAdminRole).Association("Menus").Replace(allMenus); err != nil {
-		return err
-	}
-
 	// 创建默认管理员用户
 	hashedPassword, err := utils.HashPassword("admin123")
 	if err != nil {
@@ -129,6 +51,38 @@ func Seed() error {
 
 	// 将超级管理员角色分配给管理员用户
 	if err := db.Model(&adminUser).Association("Roles").Replace([]model.Role{superAdminRole}); err != nil {
+		return err
+	}
+
+	// 创建普通工单用户角色
+	ticketUserRole := model.Role{
+		Name:        "ticket_user",
+		Description: "普通工单用户，可创建、查看和审批工单",
+		Status:      1,
+	}
+	if err := db.FirstOrCreate(&ticketUserRole, model.Role{Name: "ticket_user"}).Error; err != nil {
+		return err
+	}
+
+	// 创建普通用户
+	userPassword, err := utils.HashPassword("user123")
+	if err != nil {
+		return err
+	}
+
+	normalUser := model.User{
+		Username: "user",
+		Password: userPassword,
+		Email:    "user@example.com",
+		Status:   1,
+	}
+
+	if err := db.FirstOrCreate(&normalUser, model.User{Username: "user"}).Error; err != nil {
+		return err
+	}
+
+	// 将普通用户角色分配给普通用户
+	if err := db.Model(&normalUser).Association("Roles").Replace([]model.Role{ticketUserRole}); err != nil {
 		return err
 	}
 
@@ -225,10 +179,24 @@ func SyncAPIDefinitions() error {
 		{Name: "工单类型创建", Path: "/api/v1/ticket-types", Method: "POST", Resource: "ticket", Description: "创建工单类型"},
 		{Name: "工单类型更新", Path: "/api/v1/ticket-types/:id", Method: "PUT", Resource: "ticket", Description: "更新工单类型"},
 		{Name: "工单类型删除", Path: "/api/v1/ticket-types/:id", Method: "DELETE", Resource: "ticket", Description: "删除工单类型"},
+		// 表单模板管理
+		{Name: "表单模板列表", Path: "/api/v1/form-templates", Method: "GET", Resource: "ticket", Description: "查看表单模板列表"},
+		{Name: "表单模板启用列表", Path: "/api/v1/form-templates/enabled", Method: "GET", Resource: "ticket", Description: "查看启用的表单模板"},
+		{Name: "表单模板详情", Path: "/api/v1/form-templates/:id", Method: "GET", Resource: "ticket", Description: "查看表单模板详情"},
+		{Name: "表单模板创建", Path: "/api/v1/form-templates", Method: "POST", Resource: "ticket", Description: "创建表单模板"},
+		{Name: "表单模板更新", Path: "/api/v1/form-templates/:id", Method: "PUT", Resource: "ticket", Description: "更新表单模板"},
+		{Name: "表单模板删除", Path: "/api/v1/form-templates/:id", Method: "DELETE", Resource: "ticket", Description: "删除表单模板"},
+		// 表单字段管理
+		{Name: "表单字段列表", Path: "/api/v1/form-templates/:id/fields", Method: "GET", Resource: "ticket", Description: "查看表单字段列表"},
+		{Name: "表单字段保存", Path: "/api/v1/form-templates/:id/fields", Method: "PUT", Resource: "ticket", Description: "保存表单字段"},
+		// 工单快捷模板管理
+		{Name: "工单模板启用列表", Path: "/api/v1/ticket-templates/enabled", Method: "GET", Resource: "ticket", Description: "查看启用的工单模板"},
 		// 工单管理
 		{Name: "工单列表", Path: "/api/v1/tickets", Method: "GET", Resource: "ticket", Description: "查看工单列表"},
 		{Name: "我的工单", Path: "/api/v1/tickets/my", Method: "GET", Resource: "ticket", Description: "查看我的工单"},
 		{Name: "待审批工单", Path: "/api/v1/tickets/pending", Method: "GET", Resource: "ticket", Description: "查看待审批工单"},
+		{Name: "我处理的工单", Path: "/api/v1/tickets/processed", Method: "GET", Resource: "ticket", Description: "查看我处理的工单"},
+		{Name: "抄送我的工单", Path: "/api/v1/tickets/cc", Method: "GET", Resource: "ticket", Description: "查看抄送我的工单"},
 		{Name: "工单统计", Path: "/api/v1/tickets/stats", Method: "GET", Resource: "ticket", Description: "查看工单统计"},
 		{Name: "工单详情", Path: "/api/v1/tickets/:id", Method: "GET", Resource: "ticket", Description: "查看工单详情"},
 		{Name: "工单创建", Path: "/api/v1/tickets", Method: "POST", Resource: "ticket", Description: "创建工单"},
@@ -240,18 +208,27 @@ func SyncAPIDefinitions() error {
 		{Name: "工单取消", Path: "/api/v1/tickets/:id/cancel", Method: "POST", Resource: "ticket", Description: "取消工单"},
 		// 审批流程管理
 		{Name: "审批流程列表", Path: "/api/v1/approval-flows", Method: "GET", Resource: "ticket", Description: "查看审批流程列表"},
+		{Name: "审批流程启用列表", Path: "/api/v1/approval-flows/enabled", Method: "GET", Resource: "ticket", Description: "查看启用的审批流程"},
 		{Name: "审批流程详情", Path: "/api/v1/approval-flows/:id", Method: "GET", Resource: "ticket", Description: "查看审批流程详情"},
-		{Name: "审批流程按类型查询", Path: "/api/v1/approval-flows/type/:type_id", Method: "GET", Resource: "ticket", Description: "按类型查看审批流程"},
 		{Name: "审批流程创建", Path: "/api/v1/approval-flows", Method: "POST", Resource: "ticket", Description: "创建审批流程"},
 		{Name: "审批流程更新", Path: "/api/v1/approval-flows/:id", Method: "PUT", Resource: "ticket", Description: "更新审批流程"},
 		{Name: "审批流程删除", Path: "/api/v1/approval-flows/:id", Method: "DELETE", Resource: "ticket", Description: "删除审批流程"},
+		{Name: "审批流程发布新版本", Path: "/api/v1/approval-flows/:id/publish", Method: "POST", Resource: "ticket", Description: "发布审批流程新版本"},
 		{Name: "审批节点查看", Path: "/api/v1/approval-flows/:id/nodes", Method: "GET", Resource: "ticket", Description: "查看审批节点"},
 		{Name: "审批节点保存", Path: "/api/v1/approval-flows/:id/nodes", Method: "PUT", Resource: "ticket", Description: "保存审批节点"},
+		{Name: "审批节点连线保存", Path: "/api/v1/approval-flows/:id/nodes-with-connections", Method: "PUT", Resource: "ticket", Description: "保存审批节点及连线"},
 		// 附件管理
 		{Name: "附件上传", Path: "/api/v1/attachments/ticket/:ticket_id", Method: "POST", Resource: "ticket", Description: "上传附件"},
 		{Name: "附件列表", Path: "/api/v1/attachments/ticket/:ticket_id", Method: "GET", Resource: "ticket", Description: "查看附件列表"},
 		{Name: "附件下载", Path: "/api/v1/attachments/:id/download", Method: "GET", Resource: "ticket", Description: "下载附件"},
 		{Name: "附件删除", Path: "/api/v1/attachments/:id", Method: "DELETE", Resource: "ticket", Description: "删除附件"},
+		// 评论管理
+		{Name: "评论列表", Path: "/api/v1/comments/ticket/:ticket_id", Method: "GET", Resource: "ticket", Description: "查看评论列表"},
+		{Name: "评论创建", Path: "/api/v1/comments/ticket/:ticket_id", Method: "POST", Resource: "ticket", Description: "创建评论"},
+		{Name: "评论删除", Path: "/api/v1/comments/:id", Method: "DELETE", Resource: "ticket", Description: "删除评论"},
+		// 审批记录
+		{Name: "审批记录", Path: "/api/v1/tickets/:id/records", Method: "GET", Resource: "ticket", Description: "查看审批记录"},
+		{Name: "审批权限检查", Path: "/api/v1/tickets/:id/can-approve", Method: "GET", Resource: "ticket", Description: "检查审批权限"},
 	}
 
 	for _, apiDef := range apiDefs {
@@ -291,6 +268,75 @@ func SyncCasbinPolicies() error {
 	return enforcer.SavePolicy()
 }
 
+// SyncTicketUserPolicies 为普通工单用户角色分配权限
+func SyncTicketUserPolicies() error {
+	enforcer := casbinPkg.GetEnforcer()
+	if enforcer == nil {
+		return nil
+	}
+
+	var ticketUserRole model.Role
+	if err := db.Where("name = ?", "ticket_user").First(&ticketUserRole).Error; err != nil {
+		return nil // 角色不存在，跳过
+	}
+
+	roleIDStr := strconv.FormatUint(uint64(ticketUserRole.ID), 10)
+
+	// 普通工单用户需要的 API 权限
+	ticketUserAPIs := []struct {
+		Path   string
+		Method string
+	}{
+		// 工单类型和模板（创建工单时需要）
+		{"/api/v1/ticket-types/enabled", "GET"},
+		{"/api/v1/ticket-templates/enabled", "GET"},
+		{"/api/v1/form-templates/:id/fields", "GET"},
+		// 工单列表
+		{"/api/v1/tickets", "GET"},
+		{"/api/v1/tickets/my", "GET"},
+		{"/api/v1/tickets/pending", "GET"},
+		{"/api/v1/tickets/processed", "GET"},
+		{"/api/v1/tickets/cc", "GET"},
+		// 工单操作
+		{"/api/v1/tickets/:id", "GET"},
+		{"/api/v1/tickets", "POST"},
+		{"/api/v1/tickets/:id", "PUT"},
+		{"/api/v1/tickets/:id", "DELETE"},
+		{"/api/v1/tickets/:id/submit", "POST"},
+		{"/api/v1/tickets/:id/approve", "POST"},
+		{"/api/v1/tickets/:id/cancel", "POST"},
+		// 附件
+		{"/api/v1/attachments/ticket/:ticket_id", "POST"},
+		{"/api/v1/attachments/ticket/:ticket_id", "GET"},
+		{"/api/v1/attachments/:id/download", "GET"},
+		// 评论
+		{"/api/v1/comments/ticket/:ticket_id", "GET"},
+		{"/api/v1/comments/ticket/:ticket_id", "POST"},
+		// 审批记录
+		{"/api/v1/tickets/:id/records", "GET"},
+		{"/api/v1/tickets/:id/can-approve", "GET"},
+		// 用户列表（选择审批人等场景需要）
+		{"/api/v1/users", "GET"},
+		// 角色列表（审批流程中选择角色需要）
+		{"/api/v1/roles", "GET"},
+	}
+
+	for _, api := range ticketUserAPIs {
+		enforcer.AddPolicy(roleIDStr, api.Path, api.Method)
+	}
+
+	// 为角色分配工单相关菜单
+	var ticketMenu model.Menu
+	if err := db.Where("path = ?", "/ticket").First(&ticketMenu).Error; err == nil {
+		var ticketListMenu model.Menu
+		if err := db.Where("path = ?", "/ticket/list").First(&ticketListMenu).Error; err == nil {
+			db.Model(&ticketUserRole).Association("Menus").Replace([]model.Menu{ticketMenu, ticketListMenu})
+		}
+	}
+
+	return enforcer.SavePolicy()
+}
+
 // SyncSystemConfigs 同步系统配置（每次启动都执行，检查并添加默认配置）
 func SyncSystemConfigs() error {
 	systemConfigs := []model.SystemConfig{
@@ -320,6 +366,28 @@ func SyncSystemConfigs() error {
 
 // SyncMenus 同步菜单数据（每次启动都执行，检查并添加新菜单）
 func SyncMenus() error {
+	// 辅助函数：创建或更新菜单
+	upsertMenu := func(menu *model.Menu) error {
+		var existing model.Menu
+		if err := db.Where("path = ?", menu.Path).First(&existing).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				// 不存在，创建新菜单
+				return db.Create(menu).Error
+			}
+			return err
+		}
+		// 已存在，更新并保留 ID
+		menu.ID = existing.ID
+		return db.Model(&existing).Updates(map[string]any{
+			"name":      menu.Name,
+			"icon":      menu.Icon,
+			"component": menu.Component,
+			"sort":      menu.Sort,
+			"status":    menu.Status,
+			"parent_id": menu.ParentID,
+		}).Error
+	}
+
 	// 创建仪表盘菜单
 	dashboardMenu := model.Menu{
 		Name:      "仪表盘",
@@ -329,7 +397,7 @@ func SyncMenus() error {
 		Sort:      1,
 		Status:    1,
 	}
-	if err := db.Where("path = ?", "/dashboard").FirstOrCreate(&dashboardMenu).Error; err != nil {
+	if err := upsertMenu(&dashboardMenu); err != nil {
 		return err
 	}
 
@@ -342,7 +410,7 @@ func SyncMenus() error {
 		Sort:      2,
 		Status:    1,
 	}
-	if err := db.Where("path = ?", "/system").FirstOrCreate(&systemMenu).Error; err != nil {
+	if err := upsertMenu(&systemMenu); err != nil {
 		return err
 	}
 
@@ -358,7 +426,7 @@ func SyncMenus() error {
 
 	for i := range systemSubMenus {
 		systemSubMenus[i].ParentID = &systemMenu.ID
-		if err := db.Where("path = ?", systemSubMenus[i].Path).FirstOrCreate(&systemSubMenus[i]).Error; err != nil {
+		if err := upsertMenu(&systemSubMenus[i]); err != nil {
 			return err
 		}
 	}
@@ -372,7 +440,7 @@ func SyncMenus() error {
 		Sort:      3,
 		Status:    1,
 	}
-	if err := db.Where("path = ?", "/sso").FirstOrCreate(&ssoMenu).Error; err != nil {
+	if err := upsertMenu(&ssoMenu); err != nil {
 		return err
 	}
 
@@ -386,7 +454,7 @@ func SyncMenus() error {
 
 	for i := range ssoSubMenus {
 		ssoSubMenus[i].ParentID = &ssoMenu.ID
-		if err := db.Where("path = ?", ssoSubMenus[i].Path).FirstOrCreate(&ssoSubMenus[i]).Error; err != nil {
+		if err := upsertMenu(&ssoSubMenus[i]); err != nil {
 			return err
 		}
 	}
@@ -400,7 +468,7 @@ func SyncMenus() error {
 		Sort:      4,
 		Status:    1,
 	}
-	if err := db.Where("path = ?", "/ticket").FirstOrCreate(&ticketMenu).Error; err != nil {
+	if err := upsertMenu(&ticketMenu); err != nil {
 		return err
 	}
 
@@ -408,13 +476,14 @@ func SyncMenus() error {
 	ticketSubMenus := []model.Menu{
 		{Name: "工单列表", Path: "/ticket/list", Icon: "FileTextOutlined", Component: "ticket/List", Sort: 1, Status: 1},
 		{Name: "类型管理", Path: "/ticket/types", Icon: "AppstoreOutlined", Component: "ticket/TypeManage", Sort: 2, Status: 1},
-		{Name: "流程管理", Path: "/ticket/flows", Icon: "ApartmentOutlined", Component: "ticket/FlowManage", Sort: 3, Status: 1},
-		{Name: "统计报表", Path: "/ticket/statistics", Icon: "BarChartOutlined", Component: "ticket/Statistics", Sort: 4, Status: 1},
+		{Name: "模板管理", Path: "/ticket/templates", Icon: "FileOutlined", Component: "ticket/TemplateManage", Sort: 3, Status: 1},
+		{Name: "流程管理", Path: "/ticket/flows", Icon: "ApartmentOutlined", Component: "ticket/FlowManage", Sort: 4, Status: 1},
+		{Name: "统计报表", Path: "/ticket/statistics", Icon: "BarChartOutlined", Component: "ticket/Statistics", Sort: 5, Status: 1},
 	}
 
 	for i := range ticketSubMenus {
 		ticketSubMenus[i].ParentID = &ticketMenu.ID
-		if err := db.Where("path = ?", ticketSubMenus[i].Path).FirstOrCreate(&ticketSubMenus[i]).Error; err != nil {
+		if err := upsertMenu(&ticketSubMenus[i]); err != nil {
 			return err
 		}
 	}

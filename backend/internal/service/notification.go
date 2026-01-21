@@ -72,6 +72,34 @@ func (s *NotificationService) NotifyPendingApproval(ticket *model.Ticket, approv
 	}
 }
 
+// NotifyTicketCC 抄送通知
+func (s *NotificationService) NotifyTicketCC(ticket *model.Ticket, ccUserIDs []uint) {
+	var creator model.User
+	migrations.GetDB().First(&creator, ticket.CreatorID)
+
+	title := fmt.Sprintf("工单抄送: %s", ticket.Title)
+	content := fmt.Sprintf("工单编号: #%d\n创建人: %s\n您已被抄送此工单，请知悉。",
+		ticket.ID, creator.Username)
+
+	for _, userID := range ccUserIDs {
+		s.sendToUser(userID, title, content)
+	}
+}
+
+// NotifyTicketUrge 催办通知
+func (s *NotificationService) NotifyTicketUrge(ticket *model.Ticket, approverIDs []uint) {
+	var creator model.User
+	migrations.GetDB().First(&creator, ticket.CreatorID)
+
+	title := fmt.Sprintf("工单催办: %s", ticket.Title)
+	content := fmt.Sprintf("工单编号: #%d\n创建人: %s\n请尽快处理此工单！",
+		ticket.ID, creator.Username)
+
+	for _, userID := range approverIDs {
+		s.sendToUser(userID, title, content)
+	}
+}
+
 // sendNotification 发送通知（广播）
 func (s *NotificationService) sendNotification(title, content string) {
 	s.sendByEmail("", title, content)

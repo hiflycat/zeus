@@ -128,16 +128,20 @@ func (s *MenuService) BuildTree(menus []model.Menu) []model.Menu {
 		menus[i].Children = []model.Menu{}
 	}
 
-	// 构建树形结构
+	// 构建树形结构 - 先添加子菜单到父菜单
 	for i := range menus {
-		if menus[i].ParentID == nil || *menus[i].ParentID == 0 {
-			// 根菜单
-			rootMenus = append(rootMenus, menus[i])
-		} else {
-			// 子菜单
+		if menus[i].ParentID != nil && *menus[i].ParentID != 0 {
+			// 子菜单，添加到父菜单的 children
 			if parent, ok := menuMap[*menus[i].ParentID]; ok {
 				parent.Children = append(parent.Children, menus[i])
 			}
+		}
+	}
+
+	// 收集根菜单（从 menuMap 获取，确保 Children 是最新的）
+	for i := range menus {
+		if menus[i].ParentID == nil || *menus[i].ParentID == 0 {
+			rootMenus = append(rootMenus, *menuMap[menus[i].ID])
 		}
 	}
 
@@ -254,7 +258,7 @@ func (s *MenuService) buildMenuTree(menus []model.Menu) []model.Menu {
 
 	// 构建树形结构
 	for i := range menuList {
-		if menuList[i].ParentID == nil {
+		if menuList[i].ParentID == nil || *menuList[i].ParentID == 0 {
 			// 根菜单
 			rootMenus = append(rootMenus, menuList[i])
 		} else {
@@ -269,7 +273,7 @@ func (s *MenuService) buildMenuTree(menus []model.Menu) []model.Menu {
 	// 重新构建 rootMenus，确保 children 正确
 	rootMenus = []model.Menu{}
 	for i := range menuList {
-		if menuList[i].ParentID == nil {
+		if menuList[i].ParentID == nil || *menuList[i].ParentID == 0 {
 			rootMenus = append(rootMenus, menuList[i])
 		}
 	}

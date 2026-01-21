@@ -24,6 +24,7 @@ const TicketList = lazy(() => import('@/pages/ticket/List'))
 const TicketDetail = lazy(() => import('@/pages/ticket/Detail'))
 const TicketCreate = lazy(() => import('@/pages/ticket/Create'))
 const TicketTypeManage = lazy(() => import('@/pages/ticket/TypeManage'))
+const TicketTemplateManage = lazy(() => import('@/pages/ticket/TemplateManage'))
 const TicketFlowManage = lazy(() => import('@/pages/ticket/FlowManage'))
 const TicketStatistics = lazy(() => import('@/pages/ticket/Statistics'))
 
@@ -82,6 +83,7 @@ export const AppRouter = () => {
             <Route path="list" element={<TicketList />} />
             <Route path="create" element={<TicketCreate />} />
             <Route path="types" element={<TicketTypeManage />} />
+            <Route path="templates" element={<TicketTemplateManage />} />
             <Route path="flows" element={<TicketFlowManage />} />
             <Route path="statistics" element={<TicketStatistics />} />
             <Route path=":id" element={<TicketDetail />} />

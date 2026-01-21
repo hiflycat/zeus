@@ -1,20 +1,32 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Send, Check, X, Upload, Download, Trash2 } from 'lucide-react'
+import { ArrowLeft, Send, Check, X, Upload, Download, Trash2, MessageSquare, Clock, Edit } from 'lucide-react'
 import {
   getTicketById,
   submitTicket,
   approveTicket,
   completeTicket,
   cancelTicket,
+  updateTicket,
   getAttachments,
   uploadAttachment,
   getAttachmentDownloadUrl,
   deleteAttachment,
+  getComments,
+  createComment,
+  deleteComment,
+  getFlowNodes,
+  getApprovalRecords,
+  checkCanApprove,
   Ticket,
   Attachment,
+  TicketComment,
+  ApprovalRecord,
+  FlowNode,
 } from '@/api/ticket'
+import { useAuthStore } from '@/store/auth'
+import { useTabsStore } from '@/store/tabs'
 import {
   Button,
   Card,
@@ -23,6 +35,7 @@ import {
   CardTitle,
   Badge,
   Textarea,
+  Input,
   Label,
   Dialog,
   DialogContent,
@@ -52,18 +65,40 @@ const priorityMap: Record<number, string> = {
 const TicketDetail = () => {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { removeTab, updateTabTitle } = useTabsStore()
+  const { user } = useAuthStore()
   const [ticket, setTicket] = useState<Ticket | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [comments, setComments] = useState<TicketComment[]>([])
+  const [approvalRecords, setApprovalRecords] = useState<ApprovalRecord[]>([])
+  const [flowNodes, setFlowNodes] = useState<FlowNode[]>([])
   const [loading, setLoading] = useState(true)
   const [approveDialogOpen, setApproveDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [approveComment, setApproveComment] = useState('')
   const [isApproving, setIsApproving] = useState(true)
+  const [canApprove, setCanApprove] = useState(false)
+  const [newComment, setNewComment] = useState('')
+  const [editForm, setEditForm] = useState({ title: '', description: '' })
+
+  const isCreator = ticket?.creator_id === user?.id
+  const isAdmin = !!user?.roles?.some((role: any) => role?.name === 'admin')
+  const canEdit = ticket?.status === 'draft' && (isCreator || isAdmin)
+  const canSubmit = ticket?.status === 'draft' && (isCreator || isAdmin)
+  const canComplete = ticket?.status === 'processing' || isAdmin
+  const canCancel = ['draft', 'pending'].includes(ticket?.status || '') && (isCreator || isAdmin)
 
   const loadTicket = async () => {
     if (!id) return
     try {
       const data = await getTicketById(parseInt(id))
       setTicket(data)
+      setEditForm({ title: data.title, description: data.description || '' })
+      await loadFlowNodes(data.flow_id)
+      if (data.title) {
+        updateTabTitle(location.pathname, data.title)
+      }
     } catch {
       toast.error('加载工单失败')
     } finally {
@@ -71,19 +106,78 @@ const TicketDetail = () => {
     }
   }
 
+  const handleBack = () => {
+    const nextKey = removeTab(location.pathname)
+    if (nextKey) {
+      navigate(nextKey, { replace: true, state: { closedTabKey: location.pathname } })
+    } else {
+      navigate('/ticket/list', { replace: true, state: { closedTabKey: location.pathname } })
+    }
+  }
+
   const loadAttachments = async () => {
     if (!id) return
     try {
       const data = await getAttachments(parseInt(id))
-      setAttachments(data)
+      setAttachments(data || [])
     } catch {
       // ignore
+    }
+  }
+
+  const loadComments = async () => {
+    if (!id) return
+    try {
+      const data = await getComments(parseInt(id))
+      setComments(data || [])
+    } catch {
+      // ignore
+    }
+  }
+
+  const loadApprovalRecords = async () => {
+    if (!id) return
+    try {
+      const data = await getApprovalRecords(parseInt(id))
+      setApprovalRecords(data || [])
+    } catch {
+      // ignore
+    }
+  }
+
+  const loadFlowNodes = async (flowId?: number) => {
+    if (!flowId) {
+      setFlowNodes([])
+      return
+    }
+    try {
+      const nodes = await getFlowNodes(flowId)
+      setFlowNodes(nodes || [])
+    } catch {
+      setFlowNodes([])
+    }
+  }
+
+  const checkApprovePermission = async () => {
+    if (!id) return
+    try {
+      if (isAdmin) {
+        setCanApprove(true)
+        return
+      }
+      const { can_approve } = await checkCanApprove(parseInt(id))
+      setCanApprove(can_approve)
+    } catch {
+      setCanApprove(false)
     }
   }
 
   useEffect(() => {
     loadTicket()
     loadAttachments()
+    loadComments()
+    loadApprovalRecords()
+    checkApprovePermission()
   }, [id])
 
   const handleSubmit = async () => {
@@ -92,6 +186,7 @@ const TicketDetail = () => {
       await submitTicket(ticket.id!)
       toast.success('工单已提交')
       loadTicket()
+      checkApprovePermission()
     } catch {
       toast.error('提交失败')
     }
@@ -105,6 +200,8 @@ const TicketDetail = () => {
       setApproveDialogOpen(false)
       setApproveComment('')
       loadTicket()
+      loadApprovalRecords()
+      checkApprovePermission()
     } catch {
       toast.error('操作失败')
     }
@@ -129,6 +226,18 @@ const TicketDetail = () => {
       loadTicket()
     } catch {
       toast.error('操作失败')
+    }
+  }
+
+  const handleEdit = async () => {
+    if (!ticket) return
+    try {
+      await updateTicket(ticket.id!, editForm)
+      toast.success('更新成功')
+      setEditDialogOpen(false)
+      loadTicket()
+    } catch {
+      toast.error('更新失败')
     }
   }
 
@@ -164,6 +273,28 @@ const TicketDetail = () => {
     }
   }
 
+  const handleAddComment = async () => {
+    if (!ticket || !newComment.trim()) return
+    try {
+      await createComment(ticket.id!, { content: newComment })
+      toast.success('评论成功')
+      setNewComment('')
+      loadComments()
+    } catch {
+      toast.error('评论失败')
+    }
+  }
+
+  const handleDeleteComment = async (comment: TicketComment) => {
+    try {
+      await deleteComment(comment.id!)
+      toast.success('删除成功')
+      loadComments()
+    } catch {
+      toast.error('删除失败')
+    }
+  }
+
   if (loading) {
     return <div className="flex justify-center py-8">加载中...</div>
   }
@@ -172,10 +303,42 @@ const TicketDetail = () => {
     return <div className="flex justify-center py-8">工单不存在</div>
   }
 
+  const formFields = ticket?.type?.template?.fields || []
+  const dataMap = new Map<number, string>()
+  ticket?.data?.forEach((item) => {
+    dataMap.set(item.field_id, item.value)
+  })
+
+  const formatFieldValue = (field: any, rawValue?: string) => {
+    if (!rawValue) return '-'
+    if (field?.field_type === 'multiselect' || field?.field_type === 'attachment') {
+      try {
+        const parsed = JSON.parse(rawValue)
+        if (Array.isArray(parsed)) {
+          return parsed.join(', ')
+        }
+        return typeof parsed === 'object' ? JSON.stringify(parsed) : String(parsed)
+      } catch {
+        return rawValue
+      }
+    }
+    if (field?.field_type === 'money') {
+      return `¥${rawValue}`
+    }
+    return rawValue
+  }
+
+  const sortedFlowNodes = flowNodes.slice().sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0))
+  const approvedNodeIds = new Set(approvalRecords.map((record) => record.node_id))
+  const currentNodeId = ticket?.current_node_id
+  const currentIndex = currentNodeId
+    ? sortedFlowNodes.findIndex((node) => node.id === currentNodeId)
+    : -1
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        <Button variant="ghost" size="icon" onClick={handleBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-xl font-semibold">工单详情 #{ticket.id}</h1>
@@ -188,7 +351,14 @@ const TicketDetail = () => {
         <div className="lg:col-span-2 space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>{ticket.title}</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>{ticket.title}</CardTitle>
+                {canEdit && (
+                  <Button variant="ghost" size="icon" onClick={() => setEditDialogOpen(true)}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="prose max-w-none">
@@ -197,21 +367,130 @@ const TicketDetail = () => {
             </CardContent>
           </Card>
 
+          {formFields.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>表单内容</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {formFields
+                    .slice()
+                    .sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0))
+                    .map((field: any) => (
+                      <div key={field.id} className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">{field.label}</Label>
+                        <div className="text-sm">
+                          {formatFieldValue(field, dataMap.get(field.id))}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <span>附件</span>
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="h-4 w-4" />
+                评论 ({comments.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Textarea
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="添加评论..."
+                  rows={2}
+                  className="flex-1"
+                />
+                <Button onClick={handleAddComment} disabled={!newComment.trim()}>
+                  发送
+                </Button>
+              </div>
+              {comments.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-4">暂无评论</p>
+              ) : (
+                <div className="space-y-3">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="flex gap-3 p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">{comment.user?.username || '未知用户'}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {comment.created_at ? new Date(comment.created_at).toLocaleString() : ''}
+                          </span>
+                        </div>
+                        <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+                      </div>
+                      {comment.user_id === user?.id && (
+                        <Button variant="ghost" size="icon" onClick={() => handleDeleteComment(comment)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                审批记录 ({approvalRecords.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {approvalRecords.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-4">暂无审批记录</p>
+              ) : (
+                <div className="space-y-3">
+                  {approvalRecords.map((record) => (
+                    <div key={record.id} className="flex gap-3 p-3 border rounded-lg">
+                      <div className={`w-2 h-2 mt-2 rounded-full ${record.result === 'approved' ? 'bg-green-500' : 'bg-red-500'}`} />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm">{record.approver?.username || '未知用户'}</span>
+                          <Badge variant={record.result === 'approved' ? 'default' : 'destructive'} className="text-xs">
+                            {record.result === 'approved' ? '通过' : '拒绝'}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {record.node?.name || ''}
+                          </span>
+                        </div>
+                        {record.comment && (
+                          <p className="text-sm text-muted-foreground">{record.comment}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {record.created_at ? new Date(record.created_at).toLocaleString() : ''}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>附件 ({attachments.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex justify-end mb-4">
                 <label className="cursor-pointer">
                   <input type="file" className="hidden" onChange={handleFileUpload} />
                   <Button variant="outline" size="sm" asChild>
                     <span><Upload className="h-4 w-4 mr-2" />上传</span>
                   </Button>
                 </label>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+              </div>
               {attachments.length === 0 ? (
-                <p className="text-muted-foreground text-sm">暂无附件</p>
+                <p className="text-muted-foreground text-sm text-center py-4">暂无附件</p>
               ) : (
                 <div className="space-y-2">
                   {attachments.map((att) => (
@@ -263,15 +542,55 @@ const TicketDetail = () => {
 
           <Card>
             <CardHeader>
+              <CardTitle>流程节点</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {sortedFlowNodes.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-2">无流程节点</p>
+              ) : (
+                <div className="space-y-2">
+                  {sortedFlowNodes.map((node, index) => {
+                    const isCurrent = currentNodeId === node.id
+                    const isCompleted = approvedNodeIds.has(node.id || 0)
+                    const isFuture = currentIndex >= 0 && index > currentIndex
+                    return (
+                      <div key={node.id || node.name} className="flex items-center gap-2">
+                        <span
+                          className={[
+                            'h-2 w-2 rounded-full',
+                            isCurrent ? 'bg-blue-500' : isCompleted ? 'bg-green-500' : isFuture ? 'bg-amber-400' : 'bg-gray-300',
+                          ].join(' ')}
+                        />
+                        <div className="flex-1 text-sm">
+                          <span className={isCurrent ? 'font-medium text-primary' : ''}>{node.name}</span>
+                          {isCurrent && <span className="ml-2 text-xs text-primary">当前</span>}
+                          {isCompleted && !isCurrent && <span className="ml-2 text-xs text-muted-foreground">已完成</span>}
+                          {!isCompleted && !isCurrent && isFuture && (
+                            <span className="ml-2 text-xs text-amber-600">后续</span>
+                          )}
+                          {!isCompleted && !isCurrent && !isFuture && currentIndex === -1 && (
+                            <span className="ml-2 text-xs text-muted-foreground">未开始</span>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
               <CardTitle>操作</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {ticket.status === 'draft' && (
+              {canSubmit && (
                 <Button className="w-full" onClick={handleSubmit}>
                   <Send className="h-4 w-4 mr-2" />提交审批
                 </Button>
               )}
-              {ticket.status === 'pending' && (
+              {ticket.status === 'pending' && (canApprove || isAdmin) && (
                 <>
                   <Button className="w-full" onClick={() => { setIsApproving(true); setApproveDialogOpen(true) }}>
                     <Check className="h-4 w-4 mr-2" />通过
@@ -281,15 +600,21 @@ const TicketDetail = () => {
                   </Button>
                 </>
               )}
-              {ticket.status === 'processing' && (
+              {canComplete && (
                 <Button className="w-full" onClick={handleComplete}>
                   <Check className="h-4 w-4 mr-2" />完成
                 </Button>
               )}
-              {['draft', 'pending'].includes(ticket.status) && (
+              {canCancel && (
                 <Button variant="outline" className="w-full" onClick={handleCancel}>
                   取消工单
                 </Button>
+              )}
+              {!canSubmit && !canApprove && !canComplete && !canCancel && ticket.status !== 'pending' && (
+                <p className="text-sm text-muted-foreground text-center">暂无可用操作</p>
+              )}
+              {ticket.status === 'pending' && !canApprove && (
+                <p className="text-sm text-muted-foreground text-center">等待审批人处理</p>
               )}
             </CardContent>
           </Card>
@@ -317,6 +642,35 @@ const TicketDetail = () => {
             <Button variant={isApproving ? 'default' : 'destructive'} onClick={() => handleApprove(isApproving)}>
               确认
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>编辑工单</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>标题</Label>
+              <Input
+                value={editForm.title}
+                onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label>描述</Label>
+              <Textarea
+                value={editForm.description}
+                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                rows={6}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>取消</Button>
+            <Button onClick={handleEdit}>保存</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

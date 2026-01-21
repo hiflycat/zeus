@@ -90,11 +90,16 @@ func Migrate() error {
 		&model.SystemConfig{},
 		&model.NavigationCategory{},
 		&model.Navigation{},
+		// 表单模板相关
+		&model.FormTemplate{},
+		&model.FormField{},
+		// 审批流程相关
+		&model.ApprovalFlow{},
+		&model.FlowNode{},
 		// 工单相关模型
 		&model.TicketType{},
 		&model.Ticket{},
-		&model.ApprovalFlow{},
-		&model.ApprovalNode{},
+		&model.TicketData{},
 		&model.ApprovalRecord{},
 		&model.TicketComment{},
 		&model.TicketAttachment{},
