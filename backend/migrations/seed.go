@@ -320,6 +320,49 @@ func SyncSystemConfigs() error {
 
 // SyncMenus 同步菜单数据（每次启动都执行，检查并添加新菜单）
 func SyncMenus() error {
+	// 创建仪表盘菜单
+	dashboardMenu := model.Menu{
+		Name:      "仪表盘",
+		Path:      "/dashboard",
+		Icon:      "LayoutDashboard",
+		Component: "dashboard",
+		Sort:      1,
+		Status:    1,
+	}
+	if err := db.Where("path = ?", "/dashboard").FirstOrCreate(&dashboardMenu).Error; err != nil {
+		return err
+	}
+
+	// 创建系统管理菜单
+	systemMenu := model.Menu{
+		Name:      "系统管理",
+		Path:      "/system",
+		Icon:      "Settings",
+		Component: "",
+		Sort:      2,
+		Status:    1,
+	}
+	if err := db.Where("path = ?", "/system").FirstOrCreate(&systemMenu).Error; err != nil {
+		return err
+	}
+
+	// 创建系统管理子菜单
+	systemSubMenus := []model.Menu{
+		{Name: "导航管理", Path: "/system/navigation", Icon: "Compass", Component: "system/navigation", Sort: 1, Status: 1},
+		{Name: "用户管理", Path: "/system/user", Icon: "Users", Component: "system/user", Sort: 2, Status: 1},
+		{Name: "角色管理", Path: "/system/role", Icon: "Shield", Component: "system/role", Sort: 3, Status: 1},
+		{Name: "API 管理", Path: "/system/api", Icon: "Code", Component: "system/api", Sort: 4, Status: 1},
+		{Name: "菜单管理", Path: "/system/menu", Icon: "Menu", Component: "system/menu", Sort: 5, Status: 1},
+		{Name: "系统设置", Path: "/system/settings", Icon: "Settings", Component: "system/settings", Sort: 6, Status: 1},
+	}
+
+	for i := range systemSubMenus {
+		systemSubMenus[i].ParentID = &systemMenu.ID
+		if err := db.Where("path = ?", systemSubMenus[i].Path).FirstOrCreate(&systemSubMenus[i]).Error; err != nil {
+			return err
+		}
+	}
+
 	// 创建 SSO 管理菜单
 	ssoMenu := model.Menu{
 		Name:      "SSO 管理",
