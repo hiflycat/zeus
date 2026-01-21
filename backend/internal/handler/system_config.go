@@ -131,7 +131,11 @@ func (h *SystemConfigHandler) TestEmail(c *gin.Context) {
 
 // GetStorageConfig 获取存储配置
 func (h *SystemConfigHandler) GetStorageConfig(c *gin.Context) {
-	value, _ := h.svc.GetByKey("storage")
+	config, _ := h.svc.GetByKey("storage")
+	var value string
+	if config != nil {
+		value = config.Value
+	}
 	response.Success(c, gin.H{"value": value})
 }
 
@@ -153,8 +157,15 @@ func (h *SystemConfigHandler) UpdateStorageConfig(c *gin.Context) {
 
 // GetNotifyConfig 获取通知配置
 func (h *SystemConfigHandler) GetNotifyConfig(c *gin.Context) {
-	dingtalk, _ := h.svc.GetByKey("notify.dingtalk")
-	wechat, _ := h.svc.GetByKey("notify.wechat")
+	dingtalkConfig, _ := h.svc.GetByKey("notify.dingtalk")
+	wechatConfig, _ := h.svc.GetByKey("notify.wechat")
+	var dingtalk, wechat string
+	if dingtalkConfig != nil {
+		dingtalk = dingtalkConfig.Value
+	}
+	if wechatConfig != nil {
+		wechat = wechatConfig.Value
+	}
 	response.Success(c, gin.H{
 		"dingtalk": dingtalk,
 		"wechat":   wechat,
