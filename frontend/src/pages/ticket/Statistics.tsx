@@ -1,27 +1,29 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { getTicketStats, TicketStats } from '@/api/ticket'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui-tw'
 
-const statusLabels: Record<string, string> = {
-  draft: '草稿',
-  pending: '待审批',
-  approved: '已通过',
-  rejected: '已拒绝',
-  processing: '处理中',
-  completed: '已完成',
-  cancelled: '已取消',
-}
-
-const priorityLabels: Record<number, string> = {
-  1: '低',
-  2: '中',
-  3: '高',
-  4: '紧急',
-}
-
 const TicketStatistics = () => {
+  const { t } = useTranslation()
   const [stats, setStats] = useState<TicketStats | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const statusLabels: Record<string, string> = {
+    draft: t('ticket.statusDraft'),
+    pending: t('ticket.statusPending'),
+    approved: t('ticket.statusApproved'),
+    rejected: t('ticket.statusRejected'),
+    processing: t('ticket.statusProcessing'),
+    completed: t('ticket.statusCompleted'),
+    cancelled: t('ticket.statusCancelled'),
+  }
+
+  const priorityLabels: Record<number, string> = {
+    1: t('ticket.priorityLow'),
+    2: t('ticket.priorityMedium'),
+    3: t('ticket.priorityHigh'),
+    4: t('ticket.priorityUrgent'),
+  }
 
   useEffect(() => {
     getTicketStats()
@@ -30,11 +32,11 @@ const TicketStatistics = () => {
   }, [])
 
   if (loading) {
-    return <div className="flex justify-center py-8">加载中...</div>
+    return <div className="flex justify-center py-8">{t('ticket.loading')}</div>
   }
 
   if (!stats) {
-    return <div className="flex justify-center py-8">加载失败</div>
+    return <div className="flex justify-center py-8">{t('ticket.stats.loadFailed')}</div>
   }
 
   const statusColors: Record<string, string> = {
@@ -56,12 +58,12 @@ const TicketStatistics = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">工单统计</h1>
+      <h1 className="text-xl font-semibold">{t('ticket.stats.title')}</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">总工单数</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('ticket.stats.total')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{stats.total}</div>
@@ -69,7 +71,7 @@ const TicketStatistics = () => {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">待处理</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('ticket.stats.pending')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-yellow-600">
@@ -79,7 +81,7 @@ const TicketStatistics = () => {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">已完成</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('ticket.stats.completed')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-green-600">{stats.by_status?.completed || 0}</div>
@@ -87,7 +89,7 @@ const TicketStatistics = () => {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">已拒绝</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{t('ticket.stats.rejected')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold text-red-600">{stats.by_status?.rejected || 0}</div>
@@ -98,7 +100,7 @@ const TicketStatistics = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>按状态分布</CardTitle>
+            <CardTitle>{t('ticket.stats.byStatus')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -121,7 +123,7 @@ const TicketStatistics = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>按优先级分布</CardTitle>
+            <CardTitle>{t('ticket.stats.byPriority')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -144,14 +146,14 @@ const TicketStatistics = () => {
 
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle>按类型分布</CardTitle>
+            <CardTitle>{t('ticket.stats.byType')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {(stats.by_type || []).map((item) => (
                 <div key={item.type_name} className="text-center p-4 border rounded-lg">
                   <div className="text-2xl font-bold">{item.count}</div>
-                  <div className="text-sm text-muted-foreground">{item.type_name || '未分类'}</div>
+                  <div className="text-sm text-muted-foreground">{item.type_name || t('ticket.stats.uncategorized')}</div>
                 </div>
               ))}
             </div>

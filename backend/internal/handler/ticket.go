@@ -79,7 +79,7 @@ func (h *TicketHandler) Delete(c *gin.Context) {
 
 func (h *TicketHandler) GetByID(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	ticket, err := h.svc.GetByID(uint(id))
+	ticket, err := h.svc.GetByIDWithDetails(uint(id))
 	if err != nil {
 		response.NotFound(c, "工单不存在")
 		return

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Plus, Trash2, GripVertical, Settings, Workflow } from 'lucide-react'
 import { DeleteConfirmCard } from '@/components/DeleteConfirmCard'
@@ -57,6 +58,7 @@ import {
 } from '@/components/ui-tw'
 
 const FlowManage = () => {
+  const { t } = useTranslation()
   const [roles, setRoles] = useState<Role[]>([])
   const [users, setUsers] = useState<User[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -104,28 +106,28 @@ const FlowManage = () => {
 
   const handleSave = async () => {
     if (!formData.name) {
-      toast.error('请输入流程名称')
+      toast.error(t('ticket.flowManage.nameRequired'))
       return
     }
     try {
       if (editing) {
         await updateApprovalFlow(editing.id!, formData)
-        toast.success('更新成功')
+        toast.success(t('ticket.updateSuccess'))
       } else {
         await createApprovalFlow(formData)
-        toast.success('创建成功')
+        toast.success(t('ticket.createSuccess'))
       }
       setDialogOpen(false)
       refresh()
     } catch {
-      toast.error('操作失败')
+      toast.error(t('ticket.operationFailed'))
     }
   }
 
   const handleDeleteConfirm = async (flow: ApprovalFlow) => {
     try {
       await deleteApprovalFlow(flow.id!)
-      toast.success('删除成功')
+      toast.success(t('ticket.deleteSuccess'))
       resetDeleting()
       refresh()
     } catch {
@@ -136,10 +138,10 @@ const FlowManage = () => {
   const handlePublish = async (flow: ApprovalFlow) => {
     try {
       await publishApprovalFlow(flow.id!)
-      toast.success('发布成功')
+      toast.success(t('ticket.flowManage.publishSuccess'))
       refresh()
     } catch {
-      toast.error('发布失败')
+      toast.error(t('ticket.flowManage.publishFailed'))
     }
   }
 
@@ -185,11 +187,11 @@ const FlowManage = () => {
     // 验证节点
     for (const node of nodes) {
       if (!node.name) {
-        toast.error('请填写所有节点名称')
+        toast.error(t('ticket.flowManage.nodeNameRequired'))
         return
       }
       if (node.node_type !== 'condition' && node.node_type !== 'cc' && !node.approver_value) {
-        toast.error('请为所有审批节点配置审批人')
+        toast.error(t('ticket.flowManage.approverRequired'))
         return
       }
     }
@@ -199,10 +201,10 @@ const FlowManage = () => {
       } else {
         await saveFlowNodes(editing.id!, nodes)
       }
-      toast.success('保存成功')
+      toast.success(t('ticket.updateSuccess'))
       setNodesDialogOpen(false)
     } catch {
-      toast.error('保存失败')
+      toast.error(t('ticket.operationFailed'))
     }
   }
 
@@ -214,8 +216,8 @@ const FlowManage = () => {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">审批流程管理</h1>
-        <Button onClick={handleCreate}><Plus className="h-4 w-4 mr-2" />新建流程</Button>
+        <h1 className="text-xl font-semibold">{t('ticket.flowManage.title')}</h1>
+        <Button onClick={handleCreate}><Plus className="h-4 w-4 mr-2" />{t('ticket.flowManage.create')}</Button>
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -223,11 +225,11 @@ const FlowManage = () => {
           <TableHeader>
             <TableRow>
               <TableHead className="w-16">ID</TableHead>
-              <TableHead>名称</TableHead>
-              <TableHead>描述</TableHead>
-              <TableHead className="w-20">版本</TableHead>
-              <TableHead className="w-24">状态</TableHead>
-              <TableHead className="w-48">操作</TableHead>
+              <TableHead>{t('ticket.flowManage.name')}</TableHead>
+              <TableHead>{t('common.description')}</TableHead>
+              <TableHead className="w-20">{t('ticket.flowManage.version')}</TableHead>
+              <TableHead className="w-24">{t('common.status')}</TableHead>
+              <TableHead className="w-48">{t('common.operation')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -242,13 +244,13 @@ const FlowManage = () => {
                   <TableCell>{flow.name}</TableCell>
                   <TableCell className="text-muted-foreground">{flow.description || '-'}</TableCell>
                   <TableCell>v{flow.version}</TableCell>
-                  <TableCell><Badge variant={flow.enabled ? 'default' : 'secondary'}>{flow.enabled ? '启用' : '禁用'}</Badge></TableCell>
+                  <TableCell><Badge variant={flow.enabled ? 'default' : 'secondary'}>{flow.enabled ? t('common.enabled') : t('common.disabled')}</Badge></TableCell>
                   <TableCell>
                     <div className="relative">
                       <TableActions>
-                        <TableActionButton variant="settings" icon={<Settings className="h-4 w-4" />} onClick={() => handleEditNodes(flow)} title="配置节点" />
+                        <TableActionButton variant="settings" icon={<Settings className="h-4 w-4" />} onClick={() => handleEditNodes(flow)} title={t('ticket.flowManage.configNodes')} />
                         <TableActionButton variant="edit" onClick={() => handleEdit(flow)} />
-                        <TableActionButton onClick={() => handlePublish(flow)}>发布</TableActionButton>
+                        <TableActionButton onClick={() => handlePublish(flow)}>{t('ticket.flowManage.publish')}</TableActionButton>
                         <TableActionButton
                           variant="delete"
                           ref={(el) => setButtonRef(flow.id!, el)}
@@ -257,7 +259,7 @@ const FlowManage = () => {
                       </TableActions>
                       <DeleteConfirmCard
                         isOpen={deletingId === flow.id}
-                        message={`确定删除审批流程 "${flow.name}" 吗？`}
+                        message={t('ticket.flowManage.deleteConfirm', { name: flow.name })}
                         onConfirm={() => handleDeleteConfirm(flow)}
                         onCancel={handleDeleteCancel}
                         buttonRef={getButtonRef(flow.id!)}
@@ -280,24 +282,24 @@ const FlowManage = () => {
       {/* 新建/编辑流程对话框 */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle>{editing ? '编辑审批流程' : '新建审批流程'}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editing ? t('ticket.flowManage.edit') : t('ticket.flowManage.create')}</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>名称 *</Label>
-              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="请输入流程名称" />
+              <Label>{t('ticket.flowManage.name')} *</Label>
+              <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder={t('ticket.flowManage.nameRequired')} />
             </div>
             <div className="space-y-2">
-              <Label>描述</Label>
-              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="请输入描述" />
+              <Label>{t('common.description')}</Label>
+              <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder={t('common.description')} />
             </div>
             <div className="flex items-center justify-between">
-              <Label>启用</Label>
+              <Label>{t('common.enabled')}</Label>
               <Switch checked={formData.enabled} onCheckedChange={(v) => setFormData({ ...formData, enabled: v })} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSave}>保存</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSave}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -307,14 +309,14 @@ const FlowManage = () => {
         <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle>配置审批节点 - {editing?.name}</DialogTitle>
+              <DialogTitle>{t('ticket.flowManage.configNodes')} - {editing?.name}</DialogTitle>
               <Tabs value={editorMode} onValueChange={(v) => setEditorMode(v as 'list' | 'visual')}>
                 <TabsList>
                   <TabsTrigger value="list">
-                    <GripVertical className="h-4 w-4 mr-1" />列表模式
+                    <GripVertical className="h-4 w-4 mr-1" />{t('ticket.flowManage.listMode')}
                   </TabsTrigger>
                   <TabsTrigger value="visual">
-                    <Workflow className="h-4 w-4 mr-1" />可视化
+                    <Workflow className="h-4 w-4 mr-1" />{t('ticket.flowManage.visualMode')}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -332,7 +334,7 @@ const FlowManage = () => {
             ) : (
               <div className="space-y-4 p-1">
                 {nodes.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">暂无节点，请点击下方按钮添加</div>
+                  <div className="text-center py-8 text-muted-foreground">{t('ticket.flowManage.noNodes')}</div>
                 ) : (
                   nodes.map((node, index) => (
                     <Card key={index}>
@@ -342,15 +344,15 @@ const FlowManage = () => {
                           <div className="flex-1 space-y-3">
                             <div className="grid grid-cols-3 gap-3">
                               <div className="space-y-1">
-                                <Label className="text-xs">节点名称 *</Label>
+                                <Label className="text-xs">{t('ticket.flowManage.nodeName')} *</Label>
                                 <Input
-                                  placeholder="节点名称"
+                                  placeholder={t('ticket.flowManage.nodeName')}
                                   value={node.name}
                                   onChange={(e) => handleNodeChange(index, 'name', e.target.value)}
                                 />
                               </div>
                               <div className="space-y-1">
-                                <Label className="text-xs">节点类型</Label>
+                                <Label className="text-xs">{t('ticket.flowManage.nodeType')}</Label>
                                 <Select
                                   value={node.node_type}
                                   onValueChange={(v) => handleNodeChange(index, 'node_type', v)}
@@ -364,7 +366,7 @@ const FlowManage = () => {
                                 </Select>
                               </div>
                               <div className="space-y-1">
-                                <Label className="text-xs">审批人类型</Label>
+                                <Label className="text-xs">{t('ticket.flowManage.approverType')}</Label>
                                 <Select
                                   value={node.approver_type || 'role'}
                                   onValueChange={(v) => handleNodeChange(index, 'approver_type', v)}
@@ -380,15 +382,15 @@ const FlowManage = () => {
                               </div>
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">审批人/值</Label>
+                              <Label className="text-xs">{t('ticket.flowManage.approverValue')}</Label>
                               {node.approver_type === 'role' ? (
                                 <Select
                                   value={node.approver_value || 'none'}
                                   onValueChange={(v) => handleNodeChange(index, 'approver_value', v === 'none' ? '' : v)}
                                 >
-                                  <SelectTrigger><SelectValue placeholder="选择角色" /></SelectTrigger>
+                                  <SelectTrigger><SelectValue placeholder={t('ticket.flowManage.selectRole')} /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="none">请选择</SelectItem>
+                                    <SelectItem value="none">{t('ticket.flowManage.pleaseSelect')}</SelectItem>
                                     {roles.filter(r => r.id != null && r.id !== 0).map((role) => (
                                       <SelectItem key={role.id} value={String(role.id)}>{role.name}</SelectItem>
                                     ))}
@@ -399,9 +401,9 @@ const FlowManage = () => {
                                   value={node.approver_value || 'none'}
                                   onValueChange={(v) => handleNodeChange(index, 'approver_value', v === 'none' ? '' : v)}
                                 >
-                                  <SelectTrigger><SelectValue placeholder="选择用户" /></SelectTrigger>
+                                  <SelectTrigger><SelectValue placeholder={t('ticket.flowManage.selectUser')} /></SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="none">请选择</SelectItem>
+                                    <SelectItem value="none">{t('ticket.flowManage.pleaseSelect')}</SelectItem>
                                     {users.filter(u => u.id != null && u.id !== 0).map((user) => (
                                       <SelectItem key={user.id} value={String(user.id)}>{user.username}</SelectItem>
                                     ))}
@@ -409,7 +411,7 @@ const FlowManage = () => {
                                 </Select>
                               ) : (
                                 <Input
-                                  placeholder="输入表单字段名"
+                                  placeholder={t('ticket.flowManage.enterFormField')}
                                   value={node.approver_value || ''}
                                   onChange={(e) => handleNodeChange(index, 'approver_value', e.target.value)}
                                 />
@@ -417,7 +419,7 @@ const FlowManage = () => {
                             </div>
                             {node.node_type === 'condition' && (
                               <div className="space-y-1">
-                                <Label className="text-xs">条件配置 (JSON)</Label>
+                                <Label className="text-xs">{t('ticket.flowManage.conditionConfig')}</Label>
                                 <Input
                                   placeholder='{"field": "amount", "operator": ">", "value": "1000"}'
                                   value={node.condition || ''}
@@ -435,15 +437,15 @@ const FlowManage = () => {
                   ))
                 )}
                 <Button variant="outline" className="w-full" onClick={handleAddNode}>
-                  <Plus className="h-4 w-4 mr-2" />添加节点
+                  <Plus className="h-4 w-4 mr-2" />{t('ticket.flowManage.addNode')}
                 </Button>
               </div>
             )}
           </div>
 
           <DialogFooter className="border-t pt-4">
-            <Button variant="outline" onClick={() => setNodesDialogOpen(false)}>取消</Button>
-            <Button onClick={handleSaveNodes}>保存节点</Button>
+            <Button variant="outline" onClick={() => setNodesDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleSaveNodes}>{t('ticket.flowManage.saveNodes')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

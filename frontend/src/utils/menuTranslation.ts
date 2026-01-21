@@ -39,6 +39,19 @@ const menuNameMap: Record<string, string> = {
   'Category Management': 'navigation.categoryManagement',
   '网站管理': 'navigation.navigationManagement',
   'Navigation Items': 'navigation.navigationManagement',
+  // 工单管理
+  '工单管理': 'ticket.title',
+  'Ticket Management': 'ticket.title',
+  '工单列表': 'ticket.list',
+  'Ticket List': 'ticket.list',
+  '类型管理': 'ticket.types',
+  'Type Management': 'ticket.types',
+  '模板管理': 'ticket.templates',
+  'Template Management': 'ticket.templates',
+  '流程管理': 'ticket.flows',
+  'Flow Management': 'ticket.flows',
+  '统计报表': 'ticket.statistics',
+  'Statistics': 'ticket.statistics',
 }
 
 /**

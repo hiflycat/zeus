@@ -21,6 +21,20 @@ func NewTicketService() *TicketService {
 	}
 }
 
+// checkTicketStatus 检查工单状态是否允许操作
+func (s *TicketService) checkTicketStatus(id uint, allowedStatus ...string) (*model.Ticket, error) {
+	var ticket model.Ticket
+	if err := migrations.GetDB().First(&ticket, id).Error; err != nil {
+		return nil, err
+	}
+	for _, status := range allowedStatus {
+		if ticket.Status == status {
+			return &ticket, nil
+		}
+	}
+	return nil, errors.New("工单状态不允许此操作")
+}
+
 func (s *TicketService) Create(ticket *model.Ticket) error {
 	return migrations.GetDB().Create(ticket).Error
 }
@@ -109,12 +123,20 @@ func (s *TicketService) Delete(id, userID uint, isAdmin bool) error {
 
 func (s *TicketService) GetByID(id uint) (*model.Ticket, error) {
 	var ticket model.Ticket
+	// 基础查询：只加载必要的关联数据
+	if err := migrations.GetDB().Preload("Type").Preload("Creator").Preload("Assignee").Preload("CurrentNode").
+		First(&ticket, id).Error; err != nil {
+		return nil, err
+	}
+	return &ticket, nil
+}
+
+// GetByIDWithDetails 获取工单详情（包含所有关联数据）
+func (s *TicketService) GetByIDWithDetails(id uint) (*model.Ticket, error) {
+	var ticket model.Ticket
 	if err := migrations.GetDB().Preload("Type").Preload("Type.Template").Preload("Type.Template.Fields").
 		Preload("Creator").Preload("Assignee").Preload("CurrentNode").
 		Preload("Data").Preload("Data.Field").
-		Preload("Comments").Preload("Comments.User").
-		Preload("Attachments").Preload("Attachments.Uploader").
-		Preload("ApprovalRecords").Preload("ApprovalRecords.Approver").Preload("ApprovalRecords.Node").
 		First(&ticket, id).Error; err != nil {
 		return nil, err
 	}
@@ -148,11 +170,14 @@ func (s *TicketService) List(page, pageSize int, keyword, status string, typeID,
 	return tickets, total, nil
 }
 
-// ListForUser 获取与用户相关的工单（创建/审批/抄送/转审/加签）
+// ListForUser 获取用户创建的工单（普通用户只能看到自己创建的）
 func (s *TicketService) ListForUser(userID uint, page, pageSize int, keyword, status string, typeID uint) ([]model.Ticket, int64, error) {
 	var tickets []model.Ticket
 	var total int64
 	db := migrations.GetDB().Model(&model.Ticket{})
+
+	// 只查询用户创建的工单
+	db = db.Where("creator_id = ?", userID)
 
 	if keyword != "" {
 		db = db.Where("title LIKE ?", "%"+keyword+"%")
@@ -163,13 +188,6 @@ func (s *TicketService) ListForUser(userID uint, page, pageSize int, keyword, st
 	if typeID > 0 {
 		db = db.Where("type_id = ?", typeID)
 	}
-
-	// 相关工单：创建者或审批记录涉及该用户（approver/delegate/cc）
-	subQuery := migrations.GetDB().Model(&model.ApprovalRecord{}).
-		Select("DISTINCT ticket_id").
-		Where("approver_id = ? OR delegate_to_id = ?", userID, userID)
-
-	db = db.Where("creator_id = ? OR id IN (?)", userID, subQuery)
 
 	db.Count(&total)
 	offset := (page - 1) * pageSize

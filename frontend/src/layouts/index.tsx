@@ -383,10 +383,10 @@ const Layout = () => {
                     <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">{user?.username?.charAt(0)?.toUpperCase() || 'U'}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 text-left min-w-0">
-                    <div className="text-xs font-medium text-sidebar-foreground truncate">{user?.username || '用户'}</div>
+                    <div className="text-xs font-medium text-sidebar-foreground truncate">{user?.username || t('menu.user')}</div>
                     {user?.roles && user.roles.length > 0 && currentRoleId && (
                       <div className="text-[10px] text-muted-foreground truncate">
-                        {user.roles.find((r: any) => r.id === currentRoleId)?.name || '未选择角色'}
+                        {user.roles.find((r: any) => r.id === currentRoleId)?.name || t('menu.noRole')}
                       </div>
                     )}
                   </div>
@@ -397,7 +397,7 @@ const Layout = () => {
                 {user?.roles && user.roles.length > 0 && (
                   <>
                     <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
-                      当前角色
+                      {t('menu.currentRole')}
                     </div>
                     <DropdownMenuRadioGroup value={currentRoleId?.toString() || ''} onValueChange={(value) => {
                       // 标记正在切换角色

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ArrowLeft, Send, Check, X, Upload, Download, Trash2, MessageSquare, Clock, Edit } from 'lucide-react'
 import {
@@ -45,24 +46,8 @@ import {
   Separator,
 } from '@/components/ui-tw'
 
-const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  draft: { label: '草稿', variant: 'secondary' },
-  pending: { label: '待审批', variant: 'default' },
-  approved: { label: '已通过', variant: 'default' },
-  rejected: { label: '已拒绝', variant: 'destructive' },
-  processing: { label: '处理中', variant: 'default' },
-  completed: { label: '已完成', variant: 'outline' },
-  cancelled: { label: '已取消', variant: 'secondary' },
-}
-
-const priorityMap: Record<number, string> = {
-  1: '低',
-  2: '中',
-  3: '高',
-  4: '紧急',
-}
-
 const TicketDetail = () => {
+  const { t } = useTranslation()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const location = useLocation()
@@ -82,6 +67,23 @@ const TicketDetail = () => {
   const [newComment, setNewComment] = useState('')
   const [editForm, setEditForm] = useState({ title: '', description: '' })
 
+  const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+    draft: { label: t('ticket.statusDraft'), variant: 'secondary' },
+    pending: { label: t('ticket.statusPending'), variant: 'default' },
+    approved: { label: t('ticket.statusApproved'), variant: 'default' },
+    rejected: { label: t('ticket.statusRejected'), variant: 'destructive' },
+    processing: { label: t('ticket.statusProcessing'), variant: 'default' },
+    completed: { label: t('ticket.statusCompleted'), variant: 'outline' },
+    cancelled: { label: t('ticket.statusCancelled'), variant: 'secondary' },
+  }
+
+  const priorityMap: Record<number, string> = {
+    1: t('ticket.priorityLow'),
+    2: t('ticket.priorityMedium'),
+    3: t('ticket.priorityHigh'),
+    4: t('ticket.priorityUrgent'),
+  }
+
   const isCreator = ticket?.creator_id === user?.id
   const isAdmin = !!user?.roles?.some((role: any) => role?.name === 'admin')
   const canEdit = ticket?.status === 'draft' && (isCreator || isAdmin)
@@ -100,7 +102,7 @@ const TicketDetail = () => {
         updateTabTitle(location.pathname, data.title)
       }
     } catch {
-      toast.error('加载工单失败')
+      toast.error(t('ticket.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -184,11 +186,11 @@ const TicketDetail = () => {
     if (!ticket) return
     try {
       await submitTicket(ticket.id!)
-      toast.success('工单已提交')
+      toast.success(t('ticket.submitSuccess'))
       loadTicket()
       checkApprovePermission()
     } catch {
-      toast.error('提交失败')
+      toast.error(t('ticket.submitFailed'))
     }
   }
 
@@ -196,14 +198,14 @@ const TicketDetail = () => {
     if (!ticket) return
     try {
       await approveTicket(ticket.id!, { approved, comment: approveComment })
-      toast.success(approved ? '已通过' : '已拒绝')
+      toast.success(approved ? t('ticket.statusApproved') : t('ticket.statusRejected'))
       setApproveDialogOpen(false)
       setApproveComment('')
       loadTicket()
       loadApprovalRecords()
       checkApprovePermission()
     } catch {
-      toast.error('操作失败')
+      toast.error(t('ticket.operationFailed'))
     }
   }
 
@@ -211,10 +213,10 @@ const TicketDetail = () => {
     if (!ticket) return
     try {
       await completeTicket(ticket.id!)
-      toast.success('工单已完成')
+      toast.success(t('ticket.statusCompleted'))
       loadTicket()
     } catch {
-      toast.error('操作失败')
+      toast.error(t('ticket.operationFailed'))
     }
   }
 
@@ -222,10 +224,10 @@ const TicketDetail = () => {
     if (!ticket) return
     try {
       await cancelTicket(ticket.id!)
-      toast.success('工单已取消')
+      toast.success(t('ticket.statusCancelled'))
       loadTicket()
     } catch {
-      toast.error('操作失败')
+      toast.error(t('ticket.operationFailed'))
     }
   }
 
@@ -233,11 +235,11 @@ const TicketDetail = () => {
     if (!ticket) return
     try {
       await updateTicket(ticket.id!, editForm)
-      toast.success('更新成功')
+      toast.success(t('ticket.updateSuccess'))
       setEditDialogOpen(false)
       loadTicket()
     } catch {
-      toast.error('更新失败')
+      toast.error(t('ticket.updateFailed'))
     }
   }
 
@@ -246,10 +248,10 @@ const TicketDetail = () => {
     if (!file || !ticket) return
     try {
       await uploadAttachment(ticket.id!, file)
-      toast.success('上传成功')
+      toast.success(t('ticket.uploadSuccess'))
       loadAttachments()
     } catch {
-      toast.error('上传失败')
+      toast.error(t('ticket.uploadFailed'))
     }
     e.target.value = ''
   }
@@ -259,17 +261,17 @@ const TicketDetail = () => {
       const { url } = await getAttachmentDownloadUrl(attachment.id!)
       window.open(url, '_blank')
     } catch {
-      toast.error('获取下载链接失败')
+      toast.error(t('ticket.downloadFailed'))
     }
   }
 
   const handleDeleteAttachment = async (attachment: Attachment) => {
     try {
       await deleteAttachment(attachment.id!)
-      toast.success('删除成功')
+      toast.success(t('ticket.deleteSuccess'))
       loadAttachments()
     } catch {
-      toast.error('删除失败')
+      toast.error(t('ticket.operationFailed'))
     }
   }
 
@@ -277,30 +279,30 @@ const TicketDetail = () => {
     if (!ticket || !newComment.trim()) return
     try {
       await createComment(ticket.id!, { content: newComment })
-      toast.success('评论成功')
+      toast.success(t('ticket.commentSuccess'))
       setNewComment('')
       loadComments()
     } catch {
-      toast.error('评论失败')
+      toast.error(t('ticket.commentFailed'))
     }
   }
 
   const handleDeleteComment = async (comment: TicketComment) => {
     try {
       await deleteComment(comment.id!)
-      toast.success('删除成功')
+      toast.success(t('ticket.deleteSuccess'))
       loadComments()
     } catch {
-      toast.error('删除失败')
+      toast.error(t('ticket.operationFailed'))
     }
   }
 
   if (loading) {
-    return <div className="flex justify-center py-8">加载中...</div>
+    return <div className="flex justify-center py-8">{t('ticket.loading')}</div>
   }
 
   if (!ticket) {
-    return <div className="flex justify-center py-8">工单不存在</div>
+    return <div className="flex justify-center py-8">{t('ticket.ticketNotExist')}</div>
   }
 
   const formFields = ticket?.type?.template?.fields || []
@@ -341,7 +343,7 @@ const TicketDetail = () => {
         <Button variant="ghost" size="icon" onClick={handleBack}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-semibold">工单详情 #{ticket.id}</h1>
+        <h1 className="text-xl font-semibold">{t('ticket.detail')} #{ticket.id}</h1>
         <Badge variant={statusMap[ticket.status]?.variant || 'default'}>
           {statusMap[ticket.status]?.label || ticket.status}
         </Badge>
@@ -362,7 +364,7 @@ const TicketDetail = () => {
             </CardHeader>
             <CardContent>
               <div className="prose max-w-none">
-                <p className="whitespace-pre-wrap">{ticket.description || '无描述'}</p>
+                <p className="whitespace-pre-wrap">{ticket.description || t('ticket.noDescription')}</p>
               </div>
             </CardContent>
           </Card>
@@ -370,7 +372,7 @@ const TicketDetail = () => {
           {formFields.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>表单内容</CardTitle>
+                <CardTitle>{t('ticket.formContent')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -394,7 +396,7 @@ const TicketDetail = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4" />
-                评论 ({comments.length})
+                {t('ticket.comments')} ({comments.length})
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -402,23 +404,23 @@ const TicketDetail = () => {
                 <Textarea
                   value={newComment}
                   onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="添加评论..."
+                  placeholder={t('ticket.addComment')}
                   rows={2}
                   className="flex-1"
                 />
                 <Button onClick={handleAddComment} disabled={!newComment.trim()}>
-                  发送
+                  {t('ticket.send')}
                 </Button>
               </div>
               {comments.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-4">暂无评论</p>
+                <p className="text-muted-foreground text-sm text-center py-4">{t('ticket.noComments')}</p>
               ) : (
                 <div className="space-y-3">
                   {comments.map((comment) => (
                     <div key={comment.id} className="flex gap-3 p-3 border rounded-lg">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{comment.user?.username || '未知用户'}</span>
+                          <span className="font-medium text-sm">{comment.user?.username || t('ticket.unknownUser')}</span>
                           <span className="text-xs text-muted-foreground">
                             {comment.created_at ? new Date(comment.created_at).toLocaleString() : ''}
                           </span>
@@ -441,12 +443,12 @@ const TicketDetail = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                审批记录 ({approvalRecords.length})
+                {t('ticket.approvalRecords')} ({approvalRecords.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
               {approvalRecords.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-4">暂无审批记录</p>
+                <p className="text-muted-foreground text-sm text-center py-4">{t('ticket.noApprovalRecords')}</p>
               ) : (
                 <div className="space-y-3">
                   {approvalRecords.map((record) => (
@@ -454,9 +456,9 @@ const TicketDetail = () => {
                       <div className={`w-2 h-2 mt-2 rounded-full ${record.result === 'approved' ? 'bg-green-500' : 'bg-red-500'}`} />
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm">{record.approver?.username || '未知用户'}</span>
+                          <span className="font-medium text-sm">{record.approver?.username || t('ticket.unknownUser')}</span>
                           <Badge variant={record.result === 'approved' ? 'default' : 'destructive'} className="text-xs">
-                            {record.result === 'approved' ? '通过' : '拒绝'}
+                            {record.result === 'approved' ? t('ticket.approve') : t('ticket.reject')}
                           </Badge>
                           <span className="text-xs text-muted-foreground">
                             {record.node?.name || ''}
@@ -478,19 +480,19 @@ const TicketDetail = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>附件 ({attachments.length})</CardTitle>
+              <CardTitle>{t('ticket.attachments')} ({attachments.length})</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex justify-end mb-4">
                 <label className="cursor-pointer">
                   <input type="file" className="hidden" onChange={handleFileUpload} />
                   <Button variant="outline" size="sm" asChild>
-                    <span><Upload className="h-4 w-4 mr-2" />上传</span>
+                    <span><Upload className="h-4 w-4 mr-2" />{t('ticket.upload')}</span>
                   </Button>
                 </label>
               </div>
               {attachments.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-4">暂无附件</p>
+                <p className="text-muted-foreground text-sm text-center py-4">{t('ticket.noAttachments')}</p>
               ) : (
                 <div className="space-y-2">
                   {attachments.map((att) => (
@@ -515,26 +517,26 @@ const TicketDetail = () => {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>工单信息</CardTitle>
+              <CardTitle>{t('ticket.ticketInfo')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">类型</span>
+                <span className="text-muted-foreground">{t('ticket.type')}</span>
                 <span>{ticket.type?.name || '-'}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
-                <span className="text-muted-foreground">优先级</span>
+                <span className="text-muted-foreground">{t('ticket.priority')}</span>
                 <span>{priorityMap[ticket.priority] || '-'}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
-                <span className="text-muted-foreground">创建人</span>
+                <span className="text-muted-foreground">{t('ticket.creator')}</span>
                 <span>{ticket.creator?.username || '-'}</span>
               </div>
               <Separator />
               <div className="flex justify-between">
-                <span className="text-muted-foreground">创建时间</span>
+                <span className="text-muted-foreground">{t('ticket.createdAt')}</span>
                 <span className="text-sm">{ticket.created_at ? new Date(ticket.created_at).toLocaleString() : '-'}</span>
               </div>
             </CardContent>
@@ -542,11 +544,11 @@ const TicketDetail = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>流程节点</CardTitle>
+              <CardTitle>{t('ticket.flowNodes')}</CardTitle>
             </CardHeader>
             <CardContent>
               {sortedFlowNodes.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-2">无流程节点</p>
+                <p className="text-sm text-muted-foreground text-center py-2">{t('ticket.noFlowNodes')}</p>
               ) : (
                 <div className="space-y-2">
                   {sortedFlowNodes.map((node, index) => {
@@ -563,13 +565,13 @@ const TicketDetail = () => {
                         />
                         <div className="flex-1 text-sm">
                           <span className={isCurrent ? 'font-medium text-primary' : ''}>{node.name}</span>
-                          {isCurrent && <span className="ml-2 text-xs text-primary">当前</span>}
-                          {isCompleted && !isCurrent && <span className="ml-2 text-xs text-muted-foreground">已完成</span>}
+                          {isCurrent && <span className="ml-2 text-xs text-primary">{t('ticket.nodeCurrent')}</span>}
+                          {isCompleted && !isCurrent && <span className="ml-2 text-xs text-muted-foreground">{t('ticket.nodeCompleted')}</span>}
                           {!isCompleted && !isCurrent && isFuture && (
-                            <span className="ml-2 text-xs text-amber-600">后续</span>
+                            <span className="ml-2 text-xs text-amber-600">{t('ticket.nodeFuture')}</span>
                           )}
                           {!isCompleted && !isCurrent && !isFuture && currentIndex === -1 && (
-                            <span className="ml-2 text-xs text-muted-foreground">未开始</span>
+                            <span className="ml-2 text-xs text-muted-foreground">{t('ticket.nodeNotStarted')}</span>
                           )}
                         </div>
                       </div>
@@ -582,39 +584,39 @@ const TicketDetail = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>操作</CardTitle>
+              <CardTitle>{t('ticket.operations')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               {canSubmit && (
                 <Button className="w-full" onClick={handleSubmit}>
-                  <Send className="h-4 w-4 mr-2" />提交审批
+                  <Send className="h-4 w-4 mr-2" />{t('ticket.submit')}
                 </Button>
               )}
               {ticket.status === 'pending' && (canApprove || isAdmin) && (
                 <>
                   <Button className="w-full" onClick={() => { setIsApproving(true); setApproveDialogOpen(true) }}>
-                    <Check className="h-4 w-4 mr-2" />通过
+                    <Check className="h-4 w-4 mr-2" />{t('ticket.approve')}
                   </Button>
                   <Button variant="destructive" className="w-full" onClick={() => { setIsApproving(false); setApproveDialogOpen(true) }}>
-                    <X className="h-4 w-4 mr-2" />拒绝
+                    <X className="h-4 w-4 mr-2" />{t('ticket.reject')}
                   </Button>
                 </>
               )}
               {canComplete && (
                 <Button className="w-full" onClick={handleComplete}>
-                  <Check className="h-4 w-4 mr-2" />完成
+                  <Check className="h-4 w-4 mr-2" />{t('ticket.complete')}
                 </Button>
               )}
               {canCancel && (
                 <Button variant="outline" className="w-full" onClick={handleCancel}>
-                  取消工单
+                  {t('ticket.cancelTicket')}
                 </Button>
               )}
               {!canSubmit && !canApprove && !canComplete && !canCancel && ticket.status !== 'pending' && (
-                <p className="text-sm text-muted-foreground text-center">暂无可用操作</p>
+                <p className="text-sm text-muted-foreground text-center">{t('ticket.noOperations')}</p>
               )}
               {ticket.status === 'pending' && !canApprove && (
-                <p className="text-sm text-muted-foreground text-center">等待审批人处理</p>
+                <p className="text-sm text-muted-foreground text-center">{t('ticket.waitingApproval')}</p>
               )}
             </CardContent>
           </Card>
@@ -624,23 +626,23 @@ const TicketDetail = () => {
       <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{isApproving ? '通过审批' : '拒绝审批'}</DialogTitle>
+            <DialogTitle>{isApproving ? t('ticket.approveDialog') : t('ticket.rejectDialog')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>审批意见</Label>
+              <Label>{t('ticket.approvalComment')}</Label>
               <Textarea
                 value={approveComment}
                 onChange={(e) => setApproveComment(e.target.value)}
-                placeholder="请输入审批意见..."
+                placeholder={t('ticket.enterApprovalComment')}
                 rows={4}
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveDialogOpen(false)}>取消</Button>
+            <Button variant="outline" onClick={() => setApproveDialogOpen(false)}>{t('common.cancel')}</Button>
             <Button variant={isApproving ? 'default' : 'destructive'} onClick={() => handleApprove(isApproving)}>
-              确认
+              {t('common.confirm')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -649,18 +651,18 @@ const TicketDetail = () => {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>编辑工单</DialogTitle>
+            <DialogTitle>{t('ticket.editTicket')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>标题</Label>
+              <Label>{t('ticket.ticketTitle')}</Label>
               <Input
                 value={editForm.title}
                 onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
               />
             </div>
             <div>
-              <Label>描述</Label>
+              <Label>{t('ticket.description')}</Label>
               <Textarea
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
@@ -669,8 +671,8 @@ const TicketDetail = () => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>取消</Button>
-            <Button onClick={handleEdit}>保存</Button>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button onClick={handleEdit}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

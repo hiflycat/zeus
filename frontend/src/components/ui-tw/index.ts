@@ -34,3 +34,4 @@ export { TableEmpty } from './table-empty'
 
 // Feedback
 export { Toaster } from './sonner'
+export { Skeleton, TableSkeleton } from './skeleton'

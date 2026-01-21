@@ -1,4 +1,5 @@
 import request from './request'
+import type { User } from './user'
 
 // ========== 表单模板相关类型 ==========
 export interface FormTemplate {
@@ -141,9 +142,9 @@ export interface Ticket {
   priority: number
   status: string
   creator_id: number
-  creator?: any
+  creator?: User
   assignee_id?: number
-  assignee?: any
+  assignee?: User
   flow_id?: number
   flow_version?: number
   current_node_id?: number
@@ -190,7 +191,7 @@ export interface Attachment {
   mime_type: string
   storage_path: string
   uploader_id: number
-  uploader?: any
+  uploader?: User
   created_at?: string
 }
 
@@ -199,7 +200,7 @@ export interface TicketComment {
   id?: number
   ticket_id: number
   user_id: number
-  user?: any
+  user?: User
   content: string
   comment_type: string
   created_at?: string
@@ -212,12 +213,12 @@ export interface ApprovalRecord {
   node_id: number
   node?: FlowNode
   approver_id: number
-  approver?: any
+  approver?: User
   action: string
   result: string
   comment: string
   delegate_to_id?: number
-  delegate_to?: any
+  delegate_to?: User
   created_at: string
 }
 

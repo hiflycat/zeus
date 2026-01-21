@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ArrowLeft, FileText, Zap } from 'lucide-react'
 import {
@@ -10,7 +11,6 @@ import {
   TicketType,
   TicketTemplate,
   FormField,
-  TICKET_PRIORITY,
 } from '@/api/ticket'
 import DynamicFormRenderer from '@/components/ticket/DynamicFormRenderer'
 import {
@@ -32,6 +32,7 @@ import {
 } from '@/components/ui-tw'
 
 const TicketCreate = () => {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const [ticketTypes, setTicketTypes] = useState<TicketType[]>([])
   const [quickTemplates, setQuickTemplates] = useState<TicketTemplate[]>([])
@@ -47,6 +48,13 @@ const TicketCreate = () => {
   const [dynamicValues, setDynamicValues] = useState<Record<string, any>>({})
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+
+  const priorityMap: Record<string, string> = {
+    '1': t('ticket.priorityLow'),
+    '2': t('ticket.priorityMedium'),
+    '3': t('ticket.priorityHigh'),
+    '4': t('ticket.priorityUrgent'),
+  }
 
   // 加载工单类型
   useEffect(() => {
@@ -114,7 +122,7 @@ const TicketCreate = () => {
       }
     }
     
-    toast.success('已应用模板')
+    toast.success(t('ticket.templateApplied'))
   }
 
   // 验证表单
@@ -122,10 +130,10 @@ const TicketCreate = () => {
     const newErrors: Record<string, string> = {}
     
     if (!formData.title.trim()) {
-      newErrors.title = '请输入工单标题'
+      newErrors.title = t('ticket.titleRequired')
     }
     if (!formData.type_id) {
-      newErrors.type_id = '请选择工单类型'
+      newErrors.type_id = t('ticket.typeRequired')
     }
     
     // 验证动态字段
@@ -134,7 +142,7 @@ const TicketCreate = () => {
         const value = dynamicValues[field.name]
         if (value === undefined || value === null || value === '' || 
             (Array.isArray(value) && value.length === 0)) {
-          newErrors[field.name] = `请填写${field.label}`
+          newErrors[field.name] = t('ticket.fillRequired', { field: field.label })
         }
       }
     })
@@ -147,7 +155,7 @@ const TicketCreate = () => {
     e.preventDefault()
     
     if (!validateForm()) {
-      toast.error('请检查表单填写')
+      toast.error(t('ticket.checkFormFailed'))
       return
     }
     
@@ -161,10 +169,10 @@ const TicketCreate = () => {
         // 动态字段数据会在后端处理
         form_data: formFields.length > 0 ? dynamicValues : undefined,
       })
-      toast.success('创建成功')
+      toast.success(t('ticket.createSuccess'))
       navigate(`/ticket/${ticket.id}`)
     } catch {
-      toast.error('创建失败')
+      toast.error(t('ticket.createFailed'))
     } finally {
       setSubmitting(false)
     }
@@ -176,7 +184,7 @@ const TicketCreate = () => {
         <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-xl font-semibold">创建工单</h1>
+        <h1 className="text-xl font-semibold">{t('ticket.create')}</h1>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -184,12 +192,12 @@ const TicketCreate = () => {
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>工单信息</CardTitle>
+              <CardTitle>{t('ticket.ticketInfo')}</CardTitle>
               {selectedType && (
                 <CardDescription>
-                  类型: {selectedType.name}
+                  {t('ticket.type')}: {selectedType.name}
                   {selectedType.template_id && (
-                    <Badge variant="outline" className="ml-2">自定义表单</Badge>
+                    <Badge variant="outline" className="ml-2">{t('ticket.customForm')}</Badge>
                   )}
                 </CardDescription>
               )}
@@ -200,13 +208,13 @@ const TicketCreate = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2 space-y-2">
                     <Label htmlFor="title">
-                      标题 <span className="text-destructive">*</span>
+                      {t('ticket.ticketTitle')} <span className="text-destructive">*</span>
                     </Label>
                     <Input
                       id="title"
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      placeholder="请输入工单标题"
+                      placeholder={t('ticket.enterTitle')}
                       className={errors.title ? 'border-destructive' : ''}
                     />
                     {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
@@ -214,14 +222,14 @@ const TicketCreate = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="type_id">
-                      类型 <span className="text-destructive">*</span>
+                      {t('ticket.type')} <span className="text-destructive">*</span>
                     </Label>
                     <Select 
                       value={formData.type_id} 
                       onValueChange={(v) => setFormData({ ...formData, type_id: v })}
                     >
                       <SelectTrigger className={errors.type_id ? 'border-destructive' : ''}>
-                        <SelectValue placeholder="请选择工单类型" />
+                        <SelectValue placeholder={t('ticket.selectType')} />
                       </SelectTrigger>
                       <SelectContent>
                         {ticketTypes.filter(t => t.id != null && t.id !== 0).map((type) => (
@@ -235,7 +243,7 @@ const TicketCreate = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="priority">优先级</Label>
+                    <Label htmlFor="priority">{t('ticket.priority')}</Label>
                     <Select 
                       value={formData.priority} 
                       onValueChange={(v) => setFormData({ ...formData, priority: v })}
@@ -244,7 +252,7 @@ const TicketCreate = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.entries(TICKET_PRIORITY).map(([key, label]) => (
+                        {Object.entries(priorityMap).map(([key, label]) => (
                           <SelectItem key={key} value={key}>{label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -256,13 +264,13 @@ const TicketCreate = () => {
                 {loadingFields ? (
                   <div className="py-8 text-center text-muted-foreground">
                     <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-2" />
-                    加载表单字段...
+                    {t('ticket.loadingFields')}
                   </div>
                 ) : formFields.length > 0 ? (
                   <div className="pt-4 border-t">
                     <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
                       <FileText className="h-4 w-4" />
-                      自定义字段
+                      {t('ticket.customFields')}
                     </h3>
                     <DynamicFormRenderer
                       fields={formFields}
@@ -276,12 +284,12 @@ const TicketCreate = () => {
                 {/* 描述字段 - 如果没有自定义表单则显示 */}
                 {formFields.length === 0 && (
                   <div className="space-y-2">
-                    <Label htmlFor="description">描述</Label>
+                    <Label htmlFor="description">{t('ticket.description')}</Label>
                     <Textarea
                       id="description"
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      placeholder="请输入工单描述"
+                      placeholder={t('ticket.description')}
                       rows={6}
                     />
                   </div>
@@ -289,10 +297,10 @@ const TicketCreate = () => {
 
                 <div className="flex gap-2 pt-4">
                   <Button type="submit" disabled={submitting}>
-                    {submitting ? '创建中...' : '创建工单'}
+                    {submitting ? t('ticket.creating') : t('ticket.create')}
                   </Button>
                   <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-                    取消
+                    {t('common.cancel')}
                   </Button>
                 </div>
               </form>
@@ -306,20 +314,20 @@ const TicketCreate = () => {
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2">
                 <Zap className="h-4 w-4" />
-                快捷模板
+                {t('ticket.quickTemplate')}
               </CardTitle>
               <CardDescription>
-                选择模板快速填充表单
+                {t('ticket.quickTemplateDesc')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {!formData.type_id ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  请先选择工单类型
+                  {t('ticket.selectTypeFirst')}
                 </p>
               ) : quickTemplates.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                  该类型暂无快捷模板
+                  {t('ticket.noQuickTemplate')}
                 </p>
               ) : (
                 <div className="space-y-2">
@@ -347,7 +355,7 @@ const TicketCreate = () => {
           {selectedType?.description && (
             <Card className="mt-4">
               <CardHeader>
-                <CardTitle className="text-base">类型说明</CardTitle>
+                <CardTitle className="text-base">{t('ticket.typeDescription')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
