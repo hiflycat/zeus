@@ -67,6 +67,13 @@ Zeus 是一个企业级运维管理中心，提供统一的导航服务、SSO �
 - 支持 Bind 认证和 Search 查询
 - 兼容主流 LDAP 客户端（GitLab、Jenkins、Nexus 等）
 
+**CAS Server**
+- CAS 3.0 协议支持
+- 标准 CAS 端点（/login、/logout、/validate、/serviceValidate、/p3/serviceValidate）
+- Service Ticket 和 Proxy Ticket 支持
+- 单点登出（Single Logout）
+- 兼容主流 CAS 客户端
+
 **多租户管理**
 - 租户隔离
 - SSO 用户/用户组管理
@@ -316,6 +323,25 @@ sso:
     admin_dn: "cn=admin,dc=zeus,dc=local"
     admin_password: "your-admin-password"
 ```
+
+#### CAS Server
+
+```yaml
+sso:
+  cas:
+    enabled: true
+    ticket_ttl: 300  # Service Ticket 有效期（秒）
+```
+
+**CAS 端点：**
+
+| 端点 | 路径 | 说明 |
+|------|------|------|
+| Login | `/cas/login` | 登录端点 |
+| Logout | `/cas/logout` | 登出端点 |
+| Validate | `/cas/validate` | CAS 1.0 票据验证 |
+| ServiceValidate | `/cas/serviceValidate` | CAS 2.0 票据验证 |
+| P3 ServiceValidate | `/cas/p3/serviceValidate` | CAS 3.0 票据验证（支持属性） |
 
 ### 文件存储配置
 
