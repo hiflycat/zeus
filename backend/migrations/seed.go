@@ -308,6 +308,35 @@ func SyncMenus() error {
 		}
 	}
 
+	// 创建工单管理菜单
+	ticketMenu := model.Menu{
+		Name:      "工单管理",
+		Path:      "/ticket",
+		Icon:      "ClipboardList",
+		Component: "",
+		Sort:      4,
+		Status:    1,
+	}
+	if err := db.Where("path = ?", "/ticket").FirstOrCreate(&ticketMenu).Error; err != nil {
+		return err
+	}
+
+	// 创建工单子菜单
+	ticketSubMenus := []model.Menu{
+		{Name: "工单列表", Path: "/ticket", Icon: "FileTextOutlined", Component: "ticket/TicketList", Sort: 1, Status: 1},
+		{Name: "创建工单", Path: "/ticket/create", Icon: "PlusOutlined", Component: "ticket/TicketCreate", Sort: 2, Status: 1},
+		{Name: "类型管理", Path: "/ticket/types", Icon: "AppstoreOutlined", Component: "ticket/TypeManage", Sort: 3, Status: 1},
+		{Name: "流程管理", Path: "/ticket/flows", Icon: "ApartmentOutlined", Component: "ticket/FlowManage", Sort: 4, Status: 1},
+		{Name: "统计报表", Path: "/ticket/statistics", Icon: "BarChartOutlined", Component: "ticket/Statistics", Sort: 5, Status: 1},
+	}
+
+	for i := range ticketSubMenus {
+		ticketSubMenus[i].ParentID = &ticketMenu.ID
+		if err := db.Where("path = ?", ticketSubMenus[i].Path).FirstOrCreate(&ticketSubMenus[i]).Error; err != nil {
+			return err
+		}
+	}
+
 	// 将所有菜单分配给超级管理员角色
 	var superAdminRole model.Role
 	if err := db.Where("name = ?", "admin").First(&superAdminRole).Error; err != nil {
