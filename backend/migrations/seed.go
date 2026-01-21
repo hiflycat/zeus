@@ -212,6 +212,46 @@ func SyncAPIDefinitions() error {
 		{Name: "OIDC客户端创建", Path: "/api/v1/sso/clients", Method: "POST", Resource: "sso_client", Description: "创建OIDC客户端"},
 		{Name: "OIDC客户端更新", Path: "/api/v1/sso/clients/:id", Method: "PUT", Resource: "sso_client", Description: "更新OIDC客户端"},
 		{Name: "OIDC客户端删除", Path: "/api/v1/sso/clients/:id", Method: "DELETE", Resource: "sso_client", Description: "删除OIDC客户端"},
+		// 存储配置
+		{Name: "存储配置查看", Path: "/api/v1/system-config/storage", Method: "GET", Resource: "system", Description: "查看存储配置"},
+		{Name: "存储配置更新", Path: "/api/v1/system-config/storage", Method: "PUT", Resource: "system", Description: "更新存储配置"},
+		// 通知配置
+		{Name: "通知配置查看", Path: "/api/v1/system-config/notify", Method: "GET", Resource: "system", Description: "查看通知配置"},
+		{Name: "通知配置更新", Path: "/api/v1/system-config/notify", Method: "PUT", Resource: "system", Description: "更新通知配置"},
+		// 工单类型管理
+		{Name: "工单类型列表", Path: "/api/v1/ticket-types", Method: "GET", Resource: "ticket", Description: "查看工单类型列表"},
+		{Name: "工单类型启用列表", Path: "/api/v1/ticket-types/enabled", Method: "GET", Resource: "ticket", Description: "查看启用的工单类型"},
+		{Name: "工单类型详情", Path: "/api/v1/ticket-types/:id", Method: "GET", Resource: "ticket", Description: "查看工单类型详情"},
+		{Name: "工单类型创建", Path: "/api/v1/ticket-types", Method: "POST", Resource: "ticket", Description: "创建工单类型"},
+		{Name: "工单类型更新", Path: "/api/v1/ticket-types/:id", Method: "PUT", Resource: "ticket", Description: "更新工单类型"},
+		{Name: "工单类型删除", Path: "/api/v1/ticket-types/:id", Method: "DELETE", Resource: "ticket", Description: "删除工单类型"},
+		// 工单管理
+		{Name: "工单列表", Path: "/api/v1/tickets", Method: "GET", Resource: "ticket", Description: "查看工单列表"},
+		{Name: "我的工单", Path: "/api/v1/tickets/my", Method: "GET", Resource: "ticket", Description: "查看我的工单"},
+		{Name: "待审批工单", Path: "/api/v1/tickets/pending", Method: "GET", Resource: "ticket", Description: "查看待审批工单"},
+		{Name: "工单统计", Path: "/api/v1/tickets/stats", Method: "GET", Resource: "ticket", Description: "查看工单统计"},
+		{Name: "工单详情", Path: "/api/v1/tickets/:id", Method: "GET", Resource: "ticket", Description: "查看工单详情"},
+		{Name: "工单创建", Path: "/api/v1/tickets", Method: "POST", Resource: "ticket", Description: "创建工单"},
+		{Name: "工单更新", Path: "/api/v1/tickets/:id", Method: "PUT", Resource: "ticket", Description: "更新工单"},
+		{Name: "工单删除", Path: "/api/v1/tickets/:id", Method: "DELETE", Resource: "ticket", Description: "删除工单"},
+		{Name: "工单提交", Path: "/api/v1/tickets/:id/submit", Method: "POST", Resource: "ticket", Description: "提交工单审批"},
+		{Name: "工单审批", Path: "/api/v1/tickets/:id/approve", Method: "POST", Resource: "ticket", Description: "审批工单"},
+		{Name: "工单完成", Path: "/api/v1/tickets/:id/complete", Method: "POST", Resource: "ticket", Description: "完成工单"},
+		{Name: "工单取消", Path: "/api/v1/tickets/:id/cancel", Method: "POST", Resource: "ticket", Description: "取消工单"},
+		// 审批流程管理
+		{Name: "审批流程列表", Path: "/api/v1/approval-flows", Method: "GET", Resource: "ticket", Description: "查看审批流程列表"},
+		{Name: "审批流程详情", Path: "/api/v1/approval-flows/:id", Method: "GET", Resource: "ticket", Description: "查看审批流程详情"},
+		{Name: "审批流程按类型查询", Path: "/api/v1/approval-flows/type/:type_id", Method: "GET", Resource: "ticket", Description: "按类型查看审批流程"},
+		{Name: "审批流程创建", Path: "/api/v1/approval-flows", Method: "POST", Resource: "ticket", Description: "创建审批流程"},
+		{Name: "审批流程更新", Path: "/api/v1/approval-flows/:id", Method: "PUT", Resource: "ticket", Description: "更新审批流程"},
+		{Name: "审批流程删除", Path: "/api/v1/approval-flows/:id", Method: "DELETE", Resource: "ticket", Description: "删除审批流程"},
+		{Name: "审批节点查看", Path: "/api/v1/approval-flows/:id/nodes", Method: "GET", Resource: "ticket", Description: "查看审批节点"},
+		{Name: "审批节点保存", Path: "/api/v1/approval-flows/:id/nodes", Method: "PUT", Resource: "ticket", Description: "保存审批节点"},
+		// 附件管理
+		{Name: "附件上传", Path: "/api/v1/attachments/ticket/:ticket_id", Method: "POST", Resource: "ticket", Description: "上传附件"},
+		{Name: "附件列表", Path: "/api/v1/attachments/ticket/:ticket_id", Method: "GET", Resource: "ticket", Description: "查看附件列表"},
+		{Name: "附件下载", Path: "/api/v1/attachments/:id/download", Method: "GET", Resource: "ticket", Description: "下载附件"},
+		{Name: "附件删除", Path: "/api/v1/attachments/:id", Method: "DELETE", Resource: "ticket", Description: "删除附件"},
 	}
 
 	for _, apiDef := range apiDefs {
@@ -323,11 +363,10 @@ func SyncMenus() error {
 
 	// 创建工单子菜单
 	ticketSubMenus := []model.Menu{
-		{Name: "工单列表", Path: "/ticket", Icon: "FileTextOutlined", Component: "ticket/TicketList", Sort: 1, Status: 1},
-		{Name: "创建工单", Path: "/ticket/create", Icon: "PlusOutlined", Component: "ticket/TicketCreate", Sort: 2, Status: 1},
-		{Name: "类型管理", Path: "/ticket/types", Icon: "AppstoreOutlined", Component: "ticket/TypeManage", Sort: 3, Status: 1},
-		{Name: "流程管理", Path: "/ticket/flows", Icon: "ApartmentOutlined", Component: "ticket/FlowManage", Sort: 4, Status: 1},
-		{Name: "统计报表", Path: "/ticket/statistics", Icon: "BarChartOutlined", Component: "ticket/Statistics", Sort: 5, Status: 1},
+		{Name: "工单列表", Path: "/ticket/list", Icon: "FileTextOutlined", Component: "ticket/List", Sort: 1, Status: 1},
+		{Name: "类型管理", Path: "/ticket/types", Icon: "AppstoreOutlined", Component: "ticket/TypeManage", Sort: 2, Status: 1},
+		{Name: "流程管理", Path: "/ticket/flows", Icon: "ApartmentOutlined", Component: "ticket/FlowManage", Sort: 3, Status: 1},
+		{Name: "统计报表", Path: "/ticket/statistics", Icon: "BarChartOutlined", Component: "ticket/Statistics", Sort: 4, Status: 1},
 	}
 
 	for i := range ticketSubMenus {

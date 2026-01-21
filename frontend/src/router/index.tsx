@@ -78,7 +78,8 @@ export const AppRouter = () => {
             <Route path="settings" element={<SystemSettings />} />
           </Route>
           <Route path="ticket">
-            <Route index element={<TicketList />} />
+            <Route index element={<Navigate to="/ticket/list" replace />} />
+            <Route path="list" element={<TicketList />} />
             <Route path="create" element={<TicketCreate />} />
             <Route path="types" element={<TicketTypeManage />} />
             <Route path="flows" element={<TicketFlowManage />} />
