@@ -99,6 +99,12 @@ import {
   UserPlus,
   UserMinus,
   UserCog,
+  ClipboardList,
+  Compass,
+  Building2,
+  GitBranch,
+  Workflow,
+  ListTodo,
 } from 'lucide-react'
 
 // 图标映射表 - Lucide Icons
@@ -216,6 +222,13 @@ export const iconMap: Record<string, LucideIcon> = {
   UserAddOutlined: UserPlus,
   UserDeleteOutlined: UserMinus,
   UsergroupAddOutlined: UserCog,
+  // 工单相关
+  ClipboardListOutlined: ClipboardList,
+  CompassOutlined: Compass,
+  BankOutlined: Building2,
+  ApartmentOutlined: GitBranch,
+  WorkflowOutlined: Workflow,
+  ListTodoOutlined: ListTodo,
 }
 
 // 图标列表

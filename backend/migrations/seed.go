@@ -324,7 +324,7 @@ func SyncMenus() error {
 	dashboardMenu := model.Menu{
 		Name:      "仪表盘",
 		Path:      "/dashboard",
-		Icon:      "LayoutDashboard",
+		Icon:      "DashboardOutlined",
 		Component: "dashboard",
 		Sort:      1,
 		Status:    1,
@@ -337,7 +337,7 @@ func SyncMenus() error {
 	systemMenu := model.Menu{
 		Name:      "系统管理",
 		Path:      "/system",
-		Icon:      "Settings",
+		Icon:      "SettingOutlined",
 		Component: "",
 		Sort:      2,
 		Status:    1,
@@ -348,12 +348,12 @@ func SyncMenus() error {
 
 	// 创建系统管理子菜单
 	systemSubMenus := []model.Menu{
-		{Name: "导航管理", Path: "/system/navigation", Icon: "Compass", Component: "system/navigation", Sort: 1, Status: 1},
-		{Name: "用户管理", Path: "/system/user", Icon: "Users", Component: "system/user", Sort: 2, Status: 1},
-		{Name: "角色管理", Path: "/system/role", Icon: "Shield", Component: "system/role", Sort: 3, Status: 1},
-		{Name: "API 管理", Path: "/system/api", Icon: "Code", Component: "system/api", Sort: 4, Status: 1},
-		{Name: "菜单管理", Path: "/system/menu", Icon: "Menu", Component: "system/menu", Sort: 5, Status: 1},
-		{Name: "系统设置", Path: "/system/settings", Icon: "Settings", Component: "system/settings", Sort: 6, Status: 1},
+		{Name: "导航管理", Path: "/system/navigation", Icon: "CompassOutlined", Component: "system/navigation", Sort: 1, Status: 1},
+		{Name: "用户管理", Path: "/system/user", Icon: "UserOutlined", Component: "system/user", Sort: 2, Status: 1},
+		{Name: "角色管理", Path: "/system/role", Icon: "SafetyOutlined", Component: "system/role", Sort: 3, Status: 1},
+		{Name: "API 管理", Path: "/system/api", Icon: "ApiOutlined", Component: "system/api", Sort: 4, Status: 1},
+		{Name: "菜单管理", Path: "/system/menu", Icon: "MenuOutlined", Component: "system/menu", Sort: 5, Status: 1},
+		{Name: "系统设置", Path: "/system/settings", Icon: "SettingOutlined", Component: "system/settings", Sort: 6, Status: 1},
 	}
 
 	for i := range systemSubMenus {
@@ -395,7 +395,7 @@ func SyncMenus() error {
 	ticketMenu := model.Menu{
 		Name:      "工单管理",
 		Path:      "/ticket",
-		Icon:      "ClipboardList",
+		Icon:      "ClipboardListOutlined",
 		Component: "",
 		Sort:      4,
 		Status:    1,
