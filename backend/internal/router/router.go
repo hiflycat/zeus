@@ -172,6 +172,21 @@ func SetupRouter() *gin.Engine {
 				ticket.POST("/:id/cancel", ticketHandler.Cancel)
 			}
 
+			// 审批流程管理
+			approvalFlowHandler := handler.NewApprovalFlowHandler()
+			approvalFlow := auth.Group("/approval-flows")
+			approvalFlow.Use(middleware.CasbinRBACMiddleware())
+			{
+				approvalFlow.GET("", approvalFlowHandler.ListFlows)
+				approvalFlow.GET("/:id", approvalFlowHandler.GetFlowByID)
+				approvalFlow.GET("/type/:type_id", approvalFlowHandler.GetFlowByTypeID)
+				approvalFlow.POST("", approvalFlowHandler.CreateFlow)
+				approvalFlow.PUT("/:id", approvalFlowHandler.UpdateFlow)
+				approvalFlow.DELETE("/:id", approvalFlowHandler.DeleteFlow)
+				approvalFlow.GET("/:id/nodes", approvalFlowHandler.GetNodes)
+				approvalFlow.PUT("/:id/nodes", approvalFlowHandler.SaveNodes)
+			}
+
 		}
 	}
 
