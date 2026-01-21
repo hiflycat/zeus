@@ -141,6 +141,19 @@ func SetupRouter() *gin.Engine {
 				systemConfig.POST("/email/test", systemConfigHandler.TestEmail)
 			}
 
+			// 工单类型管理
+			ticketTypeHandler := handler.NewTicketTypeHandler()
+			ticketType := auth.Group("/ticket-types")
+			ticketType.Use(middleware.CasbinRBACMiddleware())
+			{
+				ticketType.GET("", ticketTypeHandler.List)
+				ticketType.GET("/enabled", ticketTypeHandler.ListEnabled)
+				ticketType.GET("/:id", ticketTypeHandler.GetByID)
+				ticketType.POST("", ticketTypeHandler.Create)
+				ticketType.PUT("/:id", ticketTypeHandler.Update)
+				ticketType.DELETE("/:id", ticketTypeHandler.Delete)
+			}
+
 		}
 	}
 
