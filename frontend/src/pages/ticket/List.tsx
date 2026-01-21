@@ -196,20 +196,18 @@ const TicketList = () => {
                       <Eye className="h-4 w-4" />
                     </TableActionButton>
                     <TableActionButton
-                      variant="destructive"
-                      ref={(el) => setButtonRef(ticket, el)}
+                      variant="delete"
+                      ref={(el) => setButtonRef(ticket.id!, el)}
                       onClick={() => handleDeleteClick(ticket)}
-                    >
-                      删除
-                    </TableActionButton>
-                  </TableActions>
-                  {deletingId === ticket.id && (
-                    <DeleteConfirmCard
-                      anchorEl={getButtonRef(ticket)}
-                      onConfirm={() => handleDeleteConfirm(ticket)}
-                      onCancel={handleDeleteCancel}
                     />
-                  )}
+                  </TableActions>
+                  <DeleteConfirmCard
+                    isOpen={deletingId === ticket.id}
+                    message={`确定要删除工单 "${ticket.title}" 吗？`}
+                    buttonRef={getButtonRef(ticket.id!)}
+                    onConfirm={() => handleDeleteConfirm(ticket)}
+                    onCancel={handleDeleteCancel}
+                  />
                 </TableCell>
               </TableRow>
             ))
@@ -219,9 +217,10 @@ const TicketList = () => {
 
       {total > pageSize && (
         <Pagination
-          currentPage={page}
-          totalPages={Math.ceil(total / pageSize)}
-          onPageChange={handlePageChange}
+          current={page}
+          total={total}
+          pageSize={pageSize}
+          onChange={handlePageChange}
         />
       )}
     </div>
