@@ -173,41 +173,68 @@ Zeus 是一个企业级运维管理中心，提供统一的导航服务、SSO �
 
 ```
 zeus/
-├── backend/                 # Go 后端服务
+├── backend/                    # Go 后端服务
 │   ├── cmd/
-│   │   └── server/         # 应用入口
+│   │   └── server/            # 应用入口
 │   ├── internal/
-│   │   ├── config/         # 配置管理
-│   │   ├── model/          # 数据模型
-│   │   ├── service/        # 业务逻辑层
-│   │   ├── handler/        # HTTP 处理器
-│   │   ├── middleware/     # 中间件
-│   │   ├── casbin/         # RBAC 权限控制
-│   │   └── router/         # 路由配置
-│   ├── pkg/                # 公共包
-│   │   ├── jwt/            # JWT 工具
-│   │   ├── logger/         # 日志工具
-│   │   ├── response/       # 响应封装
-│   │   ├── storage/        # 文件存储（本地/OSS/S3）
-│   │   ├── notify/         # 通知服务（钉钉/企业微信）
-│   │   └── email/          # 邮件服务
-│   ├── migrations/         # 数据库迁移和种子数据
-│   ├── statik/             # 静态文件嵌入（自动生成）
-│   └── config.yaml.example # 配置示例
-├── frontend/                # React 前端应用
-│   ├── src/
-│   │   ├── api/            # API 请求封装
-│   │   ├── components/     # 公共组件
-│   │   │   ├── ui-tw/     # Tailwind UI 组件
-│   │   │   └── ticket/    # 工单相关组件
-│   │   ├── hooks/          # 自定义 Hooks
-│   │   ├── layouts/        # 布局组件
-│   │   ├── pages/          # 页面组件
-│   │   ├── router/         # 路由配置
-│   │   ├── store/          # 状态管理
-│   │   ├── utils/          # 工具函数
-│   │   └── i18n/           # 国际化配置
-│   └── package.json
+│   │   ├── casbin/            # RBAC 权限控制
+│   │   ├── config/            # 配置管理
+│   │   ├── core/              # 核心功能（数据库初始化、种子数据）
+│   │   ├── global/            # 全局变量
+│   │   ├── handler/           # HTTP 处理器
+│   │   │   └── sso/          # SSO 相关处理器（OIDC/LDAP/CAS）
+│   │   ├── ldap/              # LDAP 服务器
+│   │   ├── middleware/        # 中间件（JWT、CORS、日志等）
+│   │   ├── model/             # 数据模型
+│   │   │   ├── request/      # 请求模型
+│   │   │   ├── response/     # 响应模型
+│   │   │   └── sso/          # SSO 模型（用户、租户、客户端等）
+│   │   ├── router/            # 路由配置
+│   │   └── service/           # 业务逻辑层
+│   │       └── sso/          # SSO 服务（OIDC/LDAP/CAS Provider）
+│   ├── pkg/                   # 公共包
+│   │   ├── crypto/           # 加密工具
+│   │   ├── email/            # 邮件服务
+│   │   ├── jwt/              # JWT 工具
+│   │   ├── logger/           # 日志工具
+│   │   ├── notify/           # 通知服务（钉钉/企业微信）
+│   │   ├── scheduler/        # 定时任务
+│   │   ├── storage/          # 文件存储（本地/OSS/S3）
+│   │   └── utils/            # 通用工具函数
+│   ├── statik/                # 静态文件嵌入（自动生成）
+│   ├── config.yaml            # 配置文件
+│   └── config.yaml.example    # 配置示例
+├── frontend/                   # React 前端应用
+│   ├── public/                # 静态资源
+│   └── src/
+│       ├── api/               # API 请求封装
+│       ├── assets/            # 静态资源（图片、字体等）
+│       ├── components/        # 公共组件
+│       │   ├── ticket/       # 工单相关组件
+│       │   └── ui-tw/        # Tailwind UI 组件
+│       ├── hooks/             # 自定义 Hooks
+│       ├── i18n/              # 国际化配置
+│       │   └── locales/      # 语言包（zh/en）
+│       ├── layouts/           # 布局组件
+│       ├── lib/               # 第三方库封装
+│       ├── pages/             # 页面组件
+│       │   ├── api/          # API 管理
+│       │   ├── dashboard/    # 仪表盘
+│       │   ├── login/        # 登录页
+│       │   ├── menu/         # 菜单管理
+│       │   ├── navigation/   # 导航管理
+│       │   ├── oidc-callback/# OIDC 回调
+│       │   ├── role/         # 角色管理
+│       │   ├── sso/          # SSO 管理（租户/用户/应用）
+│       │   ├── system/       # 系统配置
+│       │   ├── ticket/       # 工单管理
+│       │   └── user/         # 用户管理
+│       ├── router/            # 路由配置
+│       ├── store/             # 状态管理（Zustand）
+│       └── utils/             # 工具函数
+├── docs/                       # 文档目录
+│   └── plans/                 # 设计文档
+├── image/                      # 界面截图
 └── README.md
 ```
 
