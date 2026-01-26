@@ -161,7 +161,14 @@ func (h *CASHandler) Login(c *gin.Context) {
 
 // Logout CAS 登出端点
 func (h *CASHandler) Logout(c *gin.Context) {
+	clientId := c.Param("clientId")
 	service := c.Query("service")
+
+	// 验证 clientId
+	if _, err := h.service.GetClientByID(clientId); err != nil {
+		c.Redirect(302, "/sso/error?type=invalid_client")
+		return
+	}
 
 	// 获取 TGC
 	tgc, _ := c.Cookie("TGC")
