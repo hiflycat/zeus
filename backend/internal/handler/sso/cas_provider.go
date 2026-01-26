@@ -195,6 +195,7 @@ func (h *CASHandler) Logout(c *gin.Context) {
 
 // Validate CAS 1.0 票据验证
 func (h *CASHandler) Validate(c *gin.Context) {
+	clientId := c.Param("clientId")
 	ticket := c.Query("ticket")
 	service := c.Query("service")
 
@@ -203,8 +204,20 @@ func (h *CASHandler) Validate(c *gin.Context) {
 		return
 	}
 
-	user, _, err := h.service.ValidateST(ticket, service)
+	// 验证 clientId
+	if _, err := h.service.GetClientByID(clientId); err != nil {
+		c.String(200, "no\n")
+		return
+	}
+
+	user, client, err := h.service.ValidateST(ticket, service)
 	if err != nil {
+		c.String(200, "no\n")
+		return
+	}
+
+	// 验证票据所属应用与路径中的 clientId 一致
+	if client.ClientID != clientId {
 		c.String(200, "no\n")
 		return
 	}
@@ -229,6 +242,7 @@ func (h *CASHandler) ProxyValidate(c *gin.Context) {
 
 // validateTicket 通用票据验证
 func (h *CASHandler) validateTicket(c *gin.Context, includeAttributes, isProxy bool) {
+	clientId := c.Param("clientId")
 	ticket := c.Query("ticket")
 	service := c.Query("service")
 	pgtUrl := c.Query("pgtUrl")
@@ -238,10 +252,16 @@ func (h *CASHandler) validateTicket(c *gin.Context, includeAttributes, isProxy b
 		return
 	}
 
+	// 验证 clientId
+	requestedClient, err := h.service.GetClientByID(clientId)
+	if err != nil {
+		h.sendCASError(c, "INVALID_SERVICE", "Invalid client")
+		return
+	}
+
 	var user *sso.User
 	var client *sso.OIDCClient
 	var proxies []string
-	var err error
 
 	if isProxy || strings.HasPrefix(ticket, "PT-") {
 		user, proxies, err = h.service.ValidatePT(ticket, service)
@@ -254,10 +274,16 @@ func (h *CASHandler) validateTicket(c *gin.Context, includeAttributes, isProxy b
 		return
 	}
 
+	// 验证票据所属应用与路径中的 clientId 一致
+	if client != nil && client.ClientID != clientId {
+		h.sendCASError(c, "INVALID_TICKET", "Ticket does not belong to this client")
+		return
+	}
+
 	// 处理 pgtUrl（代理回调）
 	var pgtIou string
-	if pgtUrl != "" && client != nil {
-		pgt, iou, err := h.service.CreatePGT(user.ID, client.ClientID)
+	if pgtUrl != "" && requestedClient != nil {
+		pgt, iou, err := h.service.CreatePGT(user.ID, requestedClient.ClientID)
 		if err == nil {
 			// 回调 pgtUrl
 			if h.callbackPGT(pgtUrl, pgt, iou) {
