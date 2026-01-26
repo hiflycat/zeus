@@ -331,17 +331,38 @@ sso:
   cas:
     enabled: true
     ticket_ttl: 300  # Service Ticket 有效期（秒）
+    tgt_ttl: 28800   # TGT 有效期（秒），默认 8 小时
+    single_logout: true  # 是否启用单点登出
 ```
 
 **CAS 端点：**
 
+> 注意：所有 CAS 端点都需要在路径中指定 `clientId`（应用的 client_id）
+
 | 端点 | 路径 | 说明 |
 |------|------|------|
-| Login | `/cas/login` | 登录端点 |
-| Logout | `/cas/logout` | 登出端点 |
-| Validate | `/cas/validate` | CAS 1.0 票据验证 |
-| ServiceValidate | `/cas/serviceValidate` | CAS 2.0 票据验证 |
-| P3 ServiceValidate | `/cas/p3/serviceValidate` | CAS 3.0 票据验证（支持属性） |
+| Login | `/cas/:clientId/login` | 登录端点 |
+| Logout | `/cas/:clientId/logout` | 登出端点 |
+| Validate | `/cas/:clientId/validate` | CAS 1.0 票据验证 |
+| ServiceValidate | `/cas/:clientId/serviceValidate` | CAS 2.0 票据验证 |
+| P3 ServiceValidate | `/cas/:clientId/p3/serviceValidate` | CAS 3.0 票据验证（支持属性） |
+| ProxyValidate | `/cas/:clientId/proxyValidate` | 代理票据验证 |
+| Proxy | `/cas/:clientId/proxy` | 获取代理票据 |
+| SAMLValidate | `/cas/:clientId/samlValidate` | SAML 1.1 验证 |
+
+**CAS 接入步骤：**
+
+1. 在 Zeus 管理后台创建 OIDC 应用，获取 `client_id`
+2. 配置应用的 `root_url`（如 `https://app.example.com`）
+3. 在客户端应用中配置 CAS 服务端地址
+
+**示例：** 假设 Zeus 部署在 `https://sso.example.com`，应用的 `client_id` 为 `my-app`
+
+```
+登录地址: https://sso.example.com/cas/my-app/login?service=https://app.example.com/callback
+登出地址: https://sso.example.com/cas/my-app/logout?service=https://app.example.com
+验证地址: https://sso.example.com/cas/my-app/serviceValidate?ticket=ST-xxx&service=https://app.example.com/callback
+```
 
 ### 文件存储配置
 
@@ -414,6 +435,79 @@ gitlab_rails['ldap_servers'] = {
     'base' => 'ou=users,o=tenant_name,dc=zeus,dc=local'
   }
 }
+```
+
+### Spring Boot (CAS)
+
+```yaml
+# application.yml
+cas:
+  server:
+    prefix: https://sso.example.com/cas/my-app
+    login-url: ${cas.server.prefix}/login
+    logout-url: ${cas.server.prefix}/logout
+  client:
+    service-url: https://app.example.com
+    validation-type: CAS3  # CAS1, CAS2, CAS3
+```
+
+```xml
+<!-- pom.xml -->
+<dependency>
+    <groupId>org.jasig.cas.client</groupId>
+    <artifactId>cas-client-core</artifactId>
+    <version>3.6.4</version>
+</dependency>
+```
+
+### PHP (CAS)
+
+```php
+// 使用 phpCAS 库
+phpCAS::client(CAS_VERSION_3_0, 'sso.example.com', 443, '/cas/my-app');
+phpCAS::setNoCasServerValidation();
+phpCAS::forceAuthentication();
+
+$user = phpCAS::getUser();
+$attributes = phpCAS::getAttributes();
+```
+
+### Node.js (CAS)
+
+```javascript
+// 使用 cas-authentication 库
+const CASAuthentication = require('cas-authentication');
+
+const cas = new CASAuthentication({
+  cas_url: 'https://sso.example.com/cas/my-app',
+  service_url: 'https://app.example.com',
+  cas_version: '3.0'
+});
+
+// Express 中间件
+app.get('/login', cas.bounce, (req, res) => {
+  res.send(`Hello ${req.session.cas_user}`);
+});
+```
+
+### Python Flask (CAS)
+
+```python
+# 使用 flask-cas 库
+from flask import Flask
+from flask_cas import CAS
+
+app = Flask(__name__)
+cas = CAS(app)
+
+app.config['CAS_SERVER'] = 'https://sso.example.com/cas/my-app'
+app.config['CAS_AFTER_LOGIN'] = 'index'
+
+@app.route('/')
+def index():
+    if cas.username:
+        return f'Hello {cas.username}'
+    return 'Not logged in'
 ```
 
 ## 注意事项
