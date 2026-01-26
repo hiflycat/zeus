@@ -353,7 +353,7 @@ func setupSSOProviderRoutes(r *gin.Engine, issuer string) {
 func setupCASRoutes(r *gin.Engine, issuer string, cfg *config.CASConfig) {
 	casHandler := ssoHandler.NewCASHandler(issuer, cfg)
 
-	cas := r.Group("/cas")
+	cas := r.Group("/cas/:clientId")
 	{
 		// CAS 1.0/2.0/3.0 端点
 		cas.GET("/login", casHandler.Login)
