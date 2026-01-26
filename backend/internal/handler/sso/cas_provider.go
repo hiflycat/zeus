@@ -32,14 +32,22 @@ func NewCASHandler(issuer string, cfg *config.CASConfig) *CASHandler {
 
 // Login CAS 登录端点
 func (h *CASHandler) Login(c *gin.Context) {
+	clientId := c.Param("clientId")
 	service := c.Query("service")
 	renew := c.Query("renew") == "true"
 	gateway := c.Query("gateway") == "true"
 
-	// 验证 service URL
+	// 第一重验证：clientId 必须存在且有效
+	client, err := h.service.GetClientByID(clientId)
+	if err != nil {
+		c.Redirect(302, "/sso/error?type=invalid_client")
+		return
+	}
+
+	// 第二重验证：service URL 必须属于该应用
 	if service != "" {
-		if _, err := h.service.ValidateService(service); err != nil {
-			c.Redirect(302, "/sso/error?type=invalid_redirect_uri")
+		if !h.service.ValidateServiceForClient(service, client) {
+			c.Redirect(302, "/sso/error?type=service_mismatch")
 			return
 		}
 	}
@@ -53,21 +61,19 @@ func (h *CASHandler) Login(c *gin.Context) {
 		if err == nil {
 			// TGT 有效，直接生成 ST 并重定向
 			if service != "" {
-				client, _ := h.service.ValidateService(service)
-
 				// 获取用户信息并验证租户
 				user, err := ssoService.GetUserByID(session.UserID)
 				if err != nil {
 					// 用户不存在，清除无效的 TGC
 					c.SetCookie("TGC", "", -1, "/cas", "", false, true)
-					loginURL := "/sso/login?redirect=" + url.QueryEscape("/cas/login?service="+url.QueryEscape(service))
+					loginURL := "/sso/login?redirect=" + url.QueryEscape("/cas/"+clientId+"/login?service="+url.QueryEscape(service))
 					c.Redirect(302, loginURL)
 					return
 				}
 				if err := ssoService.ValidateUserForClient(user, client); err != nil {
 					// 租户不匹配，清除无效的 TGC，让用户重新登录
 					c.SetCookie("TGC", "", -1, "/cas", "", false, true)
-					loginURL := "/sso/login?redirect=" + url.QueryEscape("/cas/login?service="+url.QueryEscape(service))
+					loginURL := "/sso/login?redirect=" + url.QueryEscape("/cas/"+clientId+"/login?service="+url.QueryEscape(service))
 					c.Redirect(302, loginURL)
 					return
 				}
@@ -97,13 +103,11 @@ func (h *CASHandler) Login(c *gin.Context) {
 		user, err := h.service.GetUserFromSession(ssoSession)
 		if err == nil {
 			// 如果有 service，验证用户租户
-			var client *sso.OIDCClient
 			if service != "" {
-				client, _ = h.service.ValidateService(service)
 				if err := ssoService.ValidateUserForClient(user, client); err != nil {
 					// 租户不匹配，清除无效的 session，让用户重新登录
 					c.SetCookie("sso_session", "", -1, "/", "", false, true)
-					loginURL := "/sso/login?redirect=" + url.QueryEscape("/cas/login?service="+url.QueryEscape(service))
+					loginURL := "/sso/login?redirect=" + url.QueryEscape("/cas/"+clientId+"/login?service="+url.QueryEscape(service))
 					c.Redirect(302, loginURL)
 					return
 				}
@@ -148,8 +152,8 @@ func (h *CASHandler) Login(c *gin.Context) {
 	// 重定向到 SSO 登录页面
 	loginURL := "/sso/login"
 	if service != "" {
-		// 构建回调 URL：/cas/login?service=xxx
-		casLoginURL := "/cas/login?service=" + url.QueryEscape(service)
+		// 构建回调 URL：/cas/:clientId/login?service=xxx
+		casLoginURL := "/cas/" + clientId + "/login?service=" + url.QueryEscape(service)
 		loginURL += "?redirect=" + url.QueryEscape(casLoginURL)
 	}
 	c.Redirect(302, loginURL)
