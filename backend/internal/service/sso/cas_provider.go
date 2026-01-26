@@ -54,6 +54,37 @@ func (s *CASProviderService) ValidateService(serviceURL string) (*sso.OIDCClient
 	return &client, nil
 }
 
+// GetClientByID 通过 clientId 获取应用
+func (s *CASProviderService) GetClientByID(clientId string) (*sso.OIDCClient, error) {
+	if clientId == "" {
+		return nil, errors.New("client ID is required")
+	}
+
+	var client sso.OIDCClient
+	if err := global.GetDB().Where("client_id = ? AND status = 1", clientId).First(&client).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("client not found")
+		}
+		return nil, err
+	}
+
+	return &client, nil
+}
+
+// ValidateServiceForClient 验证 service URL 是否属于指定应用
+func (s *CASProviderService) ValidateServiceForClient(serviceURL string, client *sso.OIDCClient) bool {
+	if serviceURL == "" || client == nil {
+		return false
+	}
+
+	parsedURL, err := url.Parse(serviceURL)
+	if err != nil {
+		return false
+	}
+
+	rootURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
+	return rootURL == client.RootURL
+}
 
 // CreateTGT 创建 TGT (Ticket Granting Ticket)
 func (s *CASProviderService) CreateTGT(userID uint) (string, error) {
