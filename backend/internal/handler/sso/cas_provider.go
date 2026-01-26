@@ -297,11 +297,18 @@ func (h *CASHandler) validateTicket(c *gin.Context, includeAttributes, isProxy b
 
 // Proxy 获取代理票据
 func (h *CASHandler) Proxy(c *gin.Context) {
+	clientId := c.Param("clientId")
 	pgt := c.Query("pgt")
 	targetService := c.Query("targetService")
 
 	if pgt == "" || targetService == "" {
 		h.sendCASError(c, "INVALID_REQUEST", "Missing required parameters")
+		return
+	}
+
+	// 验证 clientId
+	if _, err := h.service.GetClientByID(clientId); err != nil {
+		h.sendCASError(c, "INVALID_SERVICE", "Invalid client")
 		return
 	}
 
@@ -338,9 +345,17 @@ func (h *CASHandler) Proxy(c *gin.Context) {
 
 // SAMLValidate SAML 1.1 验证
 func (h *CASHandler) SAMLValidate(c *gin.Context) {
+	clientId := c.Param("clientId")
 	target := c.Query("TARGET")
+
 	if target == "" {
 		h.sendSAMLError(c, "Missing TARGET parameter")
+		return
+	}
+
+	// 验证 clientId
+	if _, err := h.service.GetClientByID(clientId); err != nil {
+		h.sendSAMLError(c, "Invalid client")
 		return
 	}
 
@@ -359,9 +374,15 @@ func (h *CASHandler) SAMLValidate(c *gin.Context) {
 	}
 
 	// 验证票据
-	user, _, err := h.service.ValidateST(ticket, target)
+	user, client, err := h.service.ValidateST(ticket, target)
 	if err != nil {
 		h.sendSAMLError(c, "ticket validation failed")
+		return
+	}
+
+	// 验证票据所属应用与路径中的 clientId 一致
+	if client.ClientID != clientId {
+		h.sendSAMLError(c, "Ticket does not belong to this client")
 		return
 	}
 
