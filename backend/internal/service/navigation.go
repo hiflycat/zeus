@@ -3,8 +3,9 @@ package service
 import (
 	"errors"
 
+	"backend/internal/global"
 	"backend/internal/model"
-	"backend/migrations"
+
 	"gorm.io/gorm"
 )
 
@@ -21,7 +22,7 @@ func (s *NavigationService) Create(navigation *model.Navigation) error {
 	// 如果指定了分类，检查分类是否存在
 	if navigation.CategoryID != nil {
 		var category model.NavigationCategory
-		if err := migrations.GetDB().Where("id = ?", *navigation.CategoryID).First(&category).Error; err != nil {
+		if err := global.GetDB().Where("id = ?", *navigation.CategoryID).First(&category).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("分类不存在")
 			}
@@ -29,20 +30,20 @@ func (s *NavigationService) Create(navigation *model.Navigation) error {
 		}
 	}
 
-	return migrations.GetDB().Create(navigation).Error
+	return global.GetDB().Create(navigation).Error
 }
 
 // Update 更新网站
 func (s *NavigationService) Update(navigationID uint, navigation *model.Navigation) error {
 	var existingNavigation model.Navigation
-	if err := migrations.GetDB().Where("id = ?", navigationID).First(&existingNavigation).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", navigationID).First(&existingNavigation).Error; err != nil {
 		return err
 	}
 
 	// 如果指定了分类，检查分类是否存在
 	if navigation.CategoryID != nil {
 		var category model.NavigationCategory
-		if err := migrations.GetDB().Where("id = ?", *navigation.CategoryID).First(&category).Error; err != nil {
+		if err := global.GetDB().Where("id = ?", *navigation.CategoryID).First(&category).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("分类不存在")
 			}
@@ -51,23 +52,23 @@ func (s *NavigationService) Update(navigationID uint, navigation *model.Navigati
 	}
 
 	// 使用 Select 明确指定要更新的字段
-	return migrations.GetDB().Model(&existingNavigation).Select("name", "url", "icon", "description", "category_id", "sort", "status").Updates(navigation).Error
+	return global.GetDB().Model(&existingNavigation).Select("name", "url", "icon", "description", "category_id", "sort", "status").Updates(navigation).Error
 }
 
 // Delete 删除网站
 func (s *NavigationService) Delete(navigationID uint) error {
 	var navigation model.Navigation
-	if err := migrations.GetDB().Where("id = ?", navigationID).First(&navigation).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", navigationID).First(&navigation).Error; err != nil {
 		return err
 	}
 
-	return migrations.GetDB().Delete(&navigation).Error
+	return global.GetDB().Delete(&navigation).Error
 }
 
 // GetByID 根据 ID 获取网站
 func (s *NavigationService) GetByID(navigationID uint) (*model.Navigation, error) {
 	var navigation model.Navigation
-	if err := migrations.GetDB().Preload("Category").Where("id = ?", navigationID).First(&navigation).Error; err != nil {
+	if err := global.GetDB().Preload("Category").Where("id = ?", navigationID).First(&navigation).Error; err != nil {
 		return nil, err
 	}
 	return &navigation, nil
@@ -78,7 +79,7 @@ func (s *NavigationService) List(page, pageSize int, keyword string, categoryID 
 	var navigations []model.Navigation
 	var total int64
 
-	query := migrations.GetDB().Model(&model.Navigation{}).Preload("Category")
+	query := global.GetDB().Model(&model.Navigation{}).Preload("Category")
 
 	// 搜索
 	if keyword != "" {

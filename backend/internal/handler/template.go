@@ -4,8 +4,10 @@ import (
 	"strconv"
 
 	"backend/internal/model"
+	"backend/internal/model/request"
+	resp "backend/internal/model/response"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -65,16 +67,18 @@ func (h *TemplateHandler) GetByID(c *gin.Context) {
 }
 
 func (h *TemplateHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	keyword := c.Query("keyword")
-	typeID, _ := strconv.ParseUint(c.Query("type_id"), 10, 32)
-	templates, total, err := h.svc.List(page, pageSize, keyword, uint(typeID))
+	var req request.ListTemplateRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
+	templates, total, err := h.svc.List(req.GetPage(), req.GetPageSize(), req.Keyword, req.TypeID)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"list": templates, "total": total, "page": page, "page_size": pageSize})
+	response.Success(c, resp.NewPageResponse(templates, total, req.GetPage(), req.GetPageSize()))
 }
 
 func (h *TemplateHandler) ListEnabled(c *gin.Context) {

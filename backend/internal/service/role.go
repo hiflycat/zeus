@@ -6,7 +6,7 @@ import (
 
 	casbinPkg "backend/internal/casbin"
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 )
 
 // RoleService 角色服务
@@ -21,27 +21,27 @@ func NewRoleService() *RoleService {
 func (s *RoleService) Create(role *model.Role) error {
 	// 检查角色名称是否已存在
 	var count int64
-	if err := migrations.GetDB().Model(&model.Role{}).Where("name = ?", role.Name).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.Role{}).Where("name = ?", role.Name).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return errors.New("角色名称已存在")
 	}
 
-	return migrations.GetDB().Create(role).Error
+	return global.GetDB().Create(role).Error
 }
 
 // Update 更新角色
 func (s *RoleService) Update(roleID uint, role *model.Role) error {
 	var existingRole model.Role
-	if err := migrations.GetDB().Where("id = ?", roleID).First(&existingRole).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", roleID).First(&existingRole).Error; err != nil {
 		return err
 	}
 
 	// 检查角色名称是否已被其他角色使用
 	if role.Name != existingRole.Name {
 		var count int64
-		if err := migrations.GetDB().Model(&model.Role{}).Where("name = ? AND id != ?", role.Name, roleID).Count(&count).Error; err != nil {
+		if err := global.GetDB().Model(&model.Role{}).Where("name = ? AND id != ?", role.Name, roleID).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
@@ -50,19 +50,19 @@ func (s *RoleService) Update(roleID uint, role *model.Role) error {
 	}
 
 	// 使用 Select 明确指定要更新的字段，包括零值字段
-	return migrations.GetDB().Model(&existingRole).Select("name", "description", "status").Updates(role).Error
+	return global.GetDB().Model(&existingRole).Select("name", "description", "status").Updates(role).Error
 }
 
 // Delete 删除角色
 func (s *RoleService) Delete(roleID uint) error {
 	var role model.Role
-	if err := migrations.GetDB().Where("id = ?", roleID).First(&role).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", roleID).First(&role).Error; err != nil {
 		return err
 	}
 
 	// 检查是否有用户使用此角色
 	var count int64
-	if err := migrations.GetDB().Model(&model.User{}).Joins("JOIN user_roles ON users.id = user_roles.user_id").Where("user_roles.role_id = ?", roleID).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.User{}).Joins("JOIN user_roles ON users.id = user_roles.user_id").Where("user_roles.role_id = ?", roleID).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
@@ -78,18 +78,18 @@ func (s *RoleService) Delete(roleID uint) error {
 	}
 
 	// 删除 role_menus 中间表记录
-	if err := migrations.GetDB().Table("role_menus").Where("role_id = ?", roleID).Delete(nil).Error; err != nil {
+	if err := global.GetDB().Table("role_menus").Where("role_id = ?", roleID).Delete(nil).Error; err != nil {
 		return err
 	}
 
 	// 删除角色
-	return migrations.GetDB().Delete(&role).Error
+	return global.GetDB().Delete(&role).Error
 }
 
 // GetByID 根据 ID 获取角色
 func (s *RoleService) GetByID(roleID uint) (*model.Role, error) {
 	var role model.Role
-	if err := migrations.GetDB().Preload("Menus").Where("id = ?", roleID).First(&role).Error; err != nil {
+	if err := global.GetDB().Preload("Menus").Where("id = ?", roleID).First(&role).Error; err != nil {
 		return nil, err
 	}
 	return &role, nil
@@ -100,7 +100,7 @@ func (s *RoleService) List(page, pageSize int, keyword string) ([]model.Role, in
 	var roles []model.Role
 	var total int64
 
-	query := migrations.GetDB().Model(&model.Role{})
+	query := global.GetDB().Model(&model.Role{})
 
 	// 搜索
 	if keyword != "" {
@@ -136,14 +136,14 @@ func (s *RoleService) GetPolicies(roleID uint) ([]uint, error) {
 // AssignMenus 分配菜单
 func (s *RoleService) AssignMenus(roleID uint, menuIDs []uint) error {
 	var role model.Role
-	if err := migrations.GetDB().Where("id = ?", roleID).First(&role).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", roleID).First(&role).Error; err != nil {
 		return err
 	}
 
 	var menus []model.Menu
-	if err := migrations.GetDB().Where("id IN ?", menuIDs).Find(&menus).Error; err != nil {
+	if err := global.GetDB().Where("id IN ?", menuIDs).Find(&menus).Error; err != nil {
 		return err
 	}
 
-	return migrations.GetDB().Model(&role).Association("Menus").Replace(menus)
+	return global.GetDB().Model(&role).Association("Menus").Replace(menus)
 }

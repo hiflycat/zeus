@@ -3,10 +3,12 @@ package handler
 import (
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"backend/internal/model"
+	"backend/internal/model/request"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // NavigationHandler 网站处理器
@@ -85,29 +87,22 @@ func (h *NavigationHandler) GetByID(c *gin.Context) {
 
 // List 获取网站列表（分页）
 func (h *NavigationHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	keyword := c.Query("keyword")
-	categoryIDStr := c.Query("category_id")
-
-	var categoryID *uint
-	if categoryIDStr != "" {
-		if id, err := strconv.ParseUint(categoryIDStr, 10, 32); err == nil {
-			cid := uint(id)
-			categoryID = &cid
-		}
+	var req request.ListNavigationRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
 	}
 
-	navigations, total, err := h.navigationService.List(page, pageSize, keyword, categoryID)
+	var categoryID *uint
+	if req.CategoryID != 0 {
+		categoryID = &req.CategoryID
+	}
+
+	navigations, total, err := h.navigationService.List(req.GetPage(), req.GetPageSize(), req.Keyword, categoryID)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{
-		"list":      navigations,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.Success(c, response.NewPageResponse(navigations, total, req.GetPage(), req.GetPageSize()))
 }

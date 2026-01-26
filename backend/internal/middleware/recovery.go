@@ -3,7 +3,7 @@ package middleware
 import (
 	"github.com/gin-gonic/gin"
 	"backend/pkg/logger"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 	"go.uber.org/zap"
 )
 

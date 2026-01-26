@@ -3,8 +3,8 @@ package sso
 import (
 	"strings"
 
+	"backend/internal/global"
 	"backend/internal/model/sso"
-	"backend/migrations"
 	"backend/pkg/utils"
 
 	"gorm.io/gorm"
@@ -23,7 +23,7 @@ func (s *TenantService) List(page, pageSize int, name string) ([]sso.Tenant, int
 	var tenants []sso.Tenant
 	var total int64
 
-	db := migrations.GetDB().Model(&sso.Tenant{})
+	db := global.GetDB().Model(&sso.Tenant{})
 	if name != "" {
 		db = db.Where("name LIKE ?", "%"+name+"%")
 	}
@@ -36,18 +36,18 @@ func (s *TenantService) List(page, pageSize int, name string) ([]sso.Tenant, int
 // GetByID 根据 ID 获取租户
 func (s *TenantService) GetByID(id uint) (*sso.Tenant, error) {
 	var tenant sso.Tenant
-	err := migrations.GetDB().First(&tenant, id).Error
+	err := global.GetDB().First(&tenant, id).Error
 	return &tenant, err
 }
 
 // Create 创建租户
 func (s *TenantService) Create(tenant *sso.Tenant) error {
-	return migrations.GetDB().Create(tenant).Error
+	return global.GetDB().Create(tenant).Error
 }
 
 // Update 更新租户
 func (s *TenantService) Update(tenant *sso.Tenant) error {
-	return migrations.GetDB().Model(tenant).Updates(map[string]interface{}{
+	return global.GetDB().Model(tenant).Updates(map[string]interface{}{
 		"name":     tenant.Name,
 		"domain":   tenant.Domain,
 		"status":   tenant.Status,
@@ -57,7 +57,7 @@ func (s *TenantService) Update(tenant *sso.Tenant) error {
 
 // Delete 删除租户
 func (s *TenantService) Delete(id uint) error {
-	return migrations.GetDB().Delete(&sso.Tenant{}, id).Error
+	return global.GetDB().Delete(&sso.Tenant{}, id).Error
 }
 
 // UserService SSO 用户服务
@@ -73,7 +73,7 @@ func (s *UserService) List(tenantID uint, page, pageSize int, username string) (
 	var users []sso.User
 	var total int64
 
-	db := migrations.GetDB().Model(&sso.User{}).Preload("Tenant").Preload("Groups")
+	db := global.GetDB().Model(&sso.User{}).Preload("Tenant").Preload("Groups")
 	if tenantID > 0 {
 		db = db.Where("tenant_id = ?", tenantID)
 	}
@@ -89,7 +89,7 @@ func (s *UserService) List(tenantID uint, page, pageSize int, username string) (
 // GetByID 根据 ID 获取用户
 func (s *UserService) GetByID(id uint) (*sso.User, error) {
 	var user sso.User
-	err := migrations.GetDB().Preload("Groups").Preload("Tenant").First(&user, id).Error
+	err := global.GetDB().Preload("Groups").Preload("Tenant").First(&user, id).Error
 	return &user, err
 }
 
@@ -100,12 +100,12 @@ func (s *UserService) Create(user *sso.User) error {
 		return err
 	}
 	user.Password = hashedPassword
-	return migrations.GetDB().Create(user).Error
+	return global.GetDB().Create(user).Error
 }
 
 // Update 更新用户
 func (s *UserService) Update(user *sso.User) error {
-	return migrations.GetDB().Model(user).Updates(map[string]interface{}{
+	return global.GetDB().Model(user).Updates(map[string]interface{}{
 		"username":     user.Username,
 		"email":        user.Email,
 		"display_name": user.DisplayName,
@@ -120,29 +120,29 @@ func (s *UserService) UpdatePassword(id uint, password string) error {
 	if err != nil {
 		return err
 	}
-	return migrations.GetDB().Model(&sso.User{}).Where("id = ?", id).Update("password", hashedPassword).Error
+	return global.GetDB().Model(&sso.User{}).Where("id = ?", id).Update("password", hashedPassword).Error
 }
 
 // Delete 删除用户
 func (s *UserService) Delete(id uint) error {
-	return migrations.GetDB().Delete(&sso.User{}, id).Error
+	return global.GetDB().Delete(&sso.User{}, id).Error
 }
 
 // AssignGroups 分配用户组
 func (s *UserService) AssignGroups(userID uint, groupIDs []uint) error {
 	var user sso.User
-	if err := migrations.GetDB().First(&user, userID).Error; err != nil {
+	if err := global.GetDB().First(&user, userID).Error; err != nil {
 		return err
 	}
 
 	var groups []*sso.Group
 	if len(groupIDs) > 0 {
-		if err := migrations.GetDB().Where("id IN ?", groupIDs).Find(&groups).Error; err != nil {
+		if err := global.GetDB().Where("id IN ?", groupIDs).Find(&groups).Error; err != nil {
 			return err
 		}
 	}
 
-	return migrations.GetDB().Model(&user).Association("Groups").Replace(groups)
+	return global.GetDB().Model(&user).Association("Groups").Replace(groups)
 }
 
 // GroupService 用户组服务
@@ -158,7 +158,7 @@ func (s *GroupService) List(tenantID uint, page, pageSize int) ([]sso.Group, int
 	var groups []sso.Group
 	var total int64
 
-	db := migrations.GetDB().Model(&sso.Group{}).Preload("Tenant")
+	db := global.GetDB().Model(&sso.Group{}).Preload("Tenant")
 	if tenantID > 0 {
 		db = db.Where("tenant_id = ?", tenantID)
 	}
@@ -171,7 +171,7 @@ func (s *GroupService) List(tenantID uint, page, pageSize int) ([]sso.Group, int
 // ListActive 获取启用的用户组列表（用于下拉选择）
 func (s *GroupService) ListActive(tenantID uint) ([]sso.Group, error) {
 	var groups []sso.Group
-	db := migrations.GetDB().Model(&sso.Group{}).Where("status = 1")
+	db := global.GetDB().Model(&sso.Group{}).Where("status = 1")
 	if tenantID > 0 {
 		db = db.Where("tenant_id = ?", tenantID)
 	}
@@ -182,18 +182,18 @@ func (s *GroupService) ListActive(tenantID uint) ([]sso.Group, error) {
 // GetByID 根据 ID 获取用户组
 func (s *GroupService) GetByID(id uint) (*sso.Group, error) {
 	var group sso.Group
-	err := migrations.GetDB().Preload("Users").First(&group, id).Error
+	err := global.GetDB().Preload("Users").First(&group, id).Error
 	return &group, err
 }
 
 // Create 创建用户组
 func (s *GroupService) Create(group *sso.Group) error {
-	return migrations.GetDB().Create(group).Error
+	return global.GetDB().Create(group).Error
 }
 
 // Update 更新用户组
 func (s *GroupService) Update(group *sso.Group) error {
-	return migrations.GetDB().Model(group).Updates(map[string]interface{}{
+	return global.GetDB().Model(group).Updates(map[string]interface{}{
 		"name":        group.Name,
 		"description": group.Description,
 		"status":      group.Status,
@@ -202,7 +202,7 @@ func (s *GroupService) Update(group *sso.Group) error {
 
 // Delete 删除用户组
 func (s *GroupService) Delete(id uint) error {
-	return migrations.GetDB().Transaction(func(tx *gorm.DB) error {
+	return global.GetDB().Transaction(func(tx *gorm.DB) error {
 		// 先清除关联
 		if err := tx.Model(&sso.Group{BaseModel: sso.BaseModel{ID: id}}).Association("Users").Clear(); err != nil {
 			return err
@@ -224,7 +224,7 @@ func (s *OIDCClientService) List(tenantID uint, page, pageSize int) ([]sso.OIDCC
 	var clients []sso.OIDCClient
 	var total int64
 
-	db := migrations.GetDB().Model(&sso.OIDCClient{})
+	db := global.GetDB().Model(&sso.OIDCClient{})
 	if tenantID > 0 {
 		db = db.Where("tenant_id = ?", tenantID)
 	}
@@ -237,14 +237,14 @@ func (s *OIDCClientService) List(tenantID uint, page, pageSize int) ([]sso.OIDCC
 // GetByID 根据 ID 获取客户端
 func (s *OIDCClientService) GetByID(id uint) (*sso.OIDCClient, error) {
 	var client sso.OIDCClient
-	err := migrations.GetDB().First(&client, id).Error
+	err := global.GetDB().First(&client, id).Error
 	return &client, err
 }
 
 // GetByClientID 根据 ClientID 获取客户端
 func (s *OIDCClientService) GetByClientID(clientID string) (*sso.OIDCClient, error) {
 	var client sso.OIDCClient
-	err := migrations.GetDB().Where("client_id = ?", clientID).First(&client).Error
+	err := global.GetDB().Where("client_id = ?", clientID).First(&client).Error
 	return &client, err
 }
 
@@ -252,14 +252,14 @@ func (s *OIDCClientService) GetByClientID(clientID string) (*sso.OIDCClient, err
 func (s *OIDCClientService) Create(client *sso.OIDCClient) error {
 	// 去除 RootURL 末尾的 /
 	client.RootURL = strings.TrimSuffix(client.RootURL, "/")
-	return migrations.GetDB().Create(client).Error
+	return global.GetDB().Create(client).Error
 }
 
 // Update 更新客户端
 func (s *OIDCClientService) Update(client *sso.OIDCClient) error {
 	// 去除 RootURL 末尾的 /
 	rootURL := strings.TrimSuffix(client.RootURL, "/")
-	return migrations.GetDB().Model(client).Updates(map[string]interface{}{
+	return global.GetDB().Model(client).Updates(map[string]interface{}{
 		"client_secret":     client.ClientSecret,
 		"name":              client.Name,
 		"description":       client.Description,
@@ -274,5 +274,5 @@ func (s *OIDCClientService) Update(client *sso.OIDCClient) error {
 
 // Delete 删除客户端
 func (s *OIDCClientService) Delete(id uint) error {
-	return migrations.GetDB().Delete(&sso.OIDCClient{}, id).Error
+	return global.GetDB().Delete(&sso.OIDCClient{}, id).Error
 }

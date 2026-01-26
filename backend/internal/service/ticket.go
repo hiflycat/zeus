@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 )
 
 type TicketService struct {
@@ -24,7 +24,7 @@ func NewTicketService() *TicketService {
 // checkTicketStatus 检查工单状态是否允许操作
 func (s *TicketService) checkTicketStatus(id uint, allowedStatus ...string) (*model.Ticket, error) {
 	var ticket model.Ticket
-	if err := migrations.GetDB().First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().First(&ticket, id).Error; err != nil {
 		return nil, err
 	}
 	for _, status := range allowedStatus {
@@ -36,12 +36,12 @@ func (s *TicketService) checkTicketStatus(id uint, allowedStatus ...string) (*mo
 }
 
 func (s *TicketService) Create(ticket *model.Ticket) error {
-	return migrations.GetDB().Create(ticket).Error
+	return global.GetDB().Create(ticket).Error
 }
 
 // CreateWithFormData 创建工单并保存动态表单数据
 func (s *TicketService) CreateWithFormData(ticket *model.Ticket, formData map[string]interface{}) error {
-	db := migrations.GetDB()
+	db := global.GetDB()
 	tx := db.Begin()
 
 	// 创建工单
@@ -97,12 +97,12 @@ func (s *TicketService) CreateWithFormData(ticket *model.Ticket, formData map[st
 }
 
 func (s *TicketService) Update(id uint, ticket *model.Ticket) error {
-	return migrations.GetDB().Model(&model.Ticket{}).Where("id = ?", id).Updates(ticket).Error
+	return global.GetDB().Model(&model.Ticket{}).Where("id = ?", id).Updates(ticket).Error
 }
 
 func (s *TicketService) Delete(id, userID uint, isAdmin bool) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().First(&ticket, id).Error; err != nil {
 		return err
 	}
 
@@ -118,13 +118,13 @@ func (s *TicketService) Delete(id, userID uint, isAdmin bool) error {
 		}
 	}
 
-	return migrations.GetDB().Delete(&model.Ticket{}, id).Error
+	return global.GetDB().Delete(&model.Ticket{}, id).Error
 }
 
 func (s *TicketService) GetByID(id uint) (*model.Ticket, error) {
 	var ticket model.Ticket
 	// 基础查询：只加载必要的关联数据
-	if err := migrations.GetDB().Preload("Type").Preload("Creator").Preload("Assignee").Preload("CurrentNode").
+	if err := global.GetDB().Preload("Type").Preload("Creator").Preload("Assignee").Preload("CurrentNode").
 		First(&ticket, id).Error; err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (s *TicketService) GetByID(id uint) (*model.Ticket, error) {
 // GetByIDWithDetails 获取工单详情（包含所有关联数据）
 func (s *TicketService) GetByIDWithDetails(id uint) (*model.Ticket, error) {
 	var ticket model.Ticket
-	if err := migrations.GetDB().Preload("Type").Preload("Type.Template").Preload("Type.Template.Fields").
+	if err := global.GetDB().Preload("Type").Preload("Type.Template").Preload("Type.Template.Fields").
 		Preload("Creator").Preload("Assignee").Preload("CurrentNode").
 		Preload("Data").Preload("Data.Field").
 		First(&ticket, id).Error; err != nil {
@@ -146,7 +146,7 @@ func (s *TicketService) GetByIDWithDetails(id uint) (*model.Ticket, error) {
 func (s *TicketService) List(page, pageSize int, keyword, status string, typeID, creatorID uint) ([]model.Ticket, int64, error) {
 	var tickets []model.Ticket
 	var total int64
-	db := migrations.GetDB().Model(&model.Ticket{})
+	db := global.GetDB().Model(&model.Ticket{})
 
 	if keyword != "" {
 		db = db.Where("title LIKE ?", "%"+keyword+"%")
@@ -174,7 +174,7 @@ func (s *TicketService) List(page, pageSize int, keyword, status string, typeID,
 func (s *TicketService) ListForUser(userID uint, page, pageSize int, keyword, status string, typeID uint) ([]model.Ticket, int64, error) {
 	var tickets []model.Ticket
 	var total int64
-	db := migrations.GetDB().Model(&model.Ticket{})
+	db := global.GetDB().Model(&model.Ticket{})
 
 	// 只查询用户创建的工单
 	db = db.Where("creator_id = ?", userID)
@@ -201,7 +201,7 @@ func (s *TicketService) ListForUser(userID uint, page, pageSize int, keyword, st
 // Submit 提交工单（从草稿变为待审批）
 func (s *TicketService) Submit(id uint) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().Preload("Type").First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().Preload("Type").First(&ticket, id).Error; err != nil {
 		return err
 	}
 	if ticket.Status != model.TicketStatusDraft {
@@ -212,7 +212,7 @@ func (s *TicketService) Submit(id uint) error {
 	var flow model.ApprovalFlow
 	if ticket.Type.FlowID == nil {
 		// 没有审批流程，直接进入处理中
-		if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		if err := global.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status": model.TicketStatusProcessing,
 		}).Error; err != nil {
 			return err
@@ -221,9 +221,9 @@ func (s *TicketService) Submit(id uint) error {
 		return nil
 	}
 
-	if err := migrations.GetDB().First(&flow, *ticket.Type.FlowID).Error; err != nil || !flow.Enabled {
+	if err := global.GetDB().First(&flow, *ticket.Type.FlowID).Error; err != nil || !flow.Enabled {
 		// 流程不存在或未启用，直接进入处理中
-		if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		if err := global.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status": model.TicketStatusProcessing,
 		}).Error; err != nil {
 			return err
@@ -234,9 +234,9 @@ func (s *TicketService) Submit(id uint) error {
 
 	// 查找第一个审批节点（非抄送节点）
 	var firstNode model.FlowNode
-	if err := migrations.GetDB().Where("flow_id = ? AND node_type != ?", flow.ID, model.FlowNodeTypeCC).
+	if err := global.GetDB().Where("flow_id = ? AND node_type != ?", flow.ID, model.FlowNodeTypeCC).
 		Order("sort_order ASC").First(&firstNode).Error; err != nil {
-		if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		if err := global.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status": model.TicketStatusProcessing,
 		}).Error; err != nil {
 			return err
@@ -248,7 +248,7 @@ func (s *TicketService) Submit(id uint) error {
 	// 处理可能的抄送节点
 	s.processCCNodes(flow.ID, &ticket)
 
-	if err := migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+	if err := global.GetDB().Model(&ticket).Updates(map[string]interface{}{
 		"status":          model.TicketStatusPending,
 		"flow_id":         flow.ID,
 		"flow_version":    flow.Version,
@@ -263,7 +263,7 @@ func (s *TicketService) Submit(id uint) error {
 // Approve 审批工单
 func (s *TicketService) Approve(id, approverID uint, approved bool, comment string) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().Preload("Data").First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().Preload("Data").First(&ticket, id).Error; err != nil {
 		return err
 	}
 	if ticket.Status != model.TicketStatusPending && ticket.Status != model.TicketStatusApproving {
@@ -275,7 +275,7 @@ func (s *TicketService) Approve(id, approverID uint, approved bool, comment stri
 
 	// 获取当前审批节点
 	var currentNode model.FlowNode
-	if err := migrations.GetDB().First(&currentNode, *ticket.CurrentNodeID).Error; err != nil {
+	if err := global.GetDB().First(&currentNode, *ticket.CurrentNodeID).Error; err != nil {
 		return err
 	}
 
@@ -294,13 +294,13 @@ func (s *TicketService) Approve(id, approverID uint, approved bool, comment stri
 		Result:     result,
 		Comment:    comment,
 	}
-	if err := migrations.GetDB().Create(&record).Error; err != nil {
+	if err := global.GetDB().Create(&record).Error; err != nil {
 		return err
 	}
 
 	// 如果拒绝，直接结束流程
 	if !approved {
-		if err := migrations.GetDB().Model(&ticket).Updates(map[string]any{
+		if err := global.GetDB().Model(&ticket).Updates(map[string]any{
 			"status":          model.TicketStatusRejected,
 			"current_node_id": nil,
 		}).Error; err != nil {
@@ -315,7 +315,7 @@ func (s *TicketService) Approve(id, approverID uint, approved bool, comment stri
 
 	if !nodeComplete {
 		// 会签未完成，保持当前节点，更新状态为审批中
-		migrations.GetDB().Model(&ticket).Update("status", model.TicketStatusApproving)
+		global.GetDB().Model(&ticket).Update("status", model.TicketStatusApproving)
 		go s.notifySvc.NotifyTicketApproved(&ticket, approved, comment)
 		return nil
 	}
@@ -324,7 +324,7 @@ func (s *TicketService) Approve(id, approverID uint, approved bool, comment stri
 	nextNode := s.getNextNode(&currentNode, &ticket)
 	if nextNode == nil {
 		// 没有下一个节点，审批完成
-		if err := migrations.GetDB().Model(&ticket).Updates(map[string]any{
+		if err := global.GetDB().Model(&ticket).Updates(map[string]any{
 			"status":          model.TicketStatusProcessing,
 			"current_node_id": nil,
 		}).Error; err != nil {
@@ -342,14 +342,14 @@ func (s *TicketService) Approve(id, approverID uint, approved bool, comment stri
 
 	if nextNode == nil {
 		// 没有下一个节点，审批完成
-		if err := migrations.GetDB().Model(&ticket).Updates(map[string]any{
+		if err := global.GetDB().Model(&ticket).Updates(map[string]any{
 			"status":          model.TicketStatusProcessing,
 			"current_node_id": nil,
 		}).Error; err != nil {
 			return err
 		}
 	} else {
-		if err := migrations.GetDB().Model(&ticket).Updates(map[string]any{
+		if err := global.GetDB().Model(&ticket).Updates(map[string]any{
 			"status":          model.TicketStatusPending,
 			"current_node_id": nextNode.ID,
 		}).Error; err != nil {
@@ -371,7 +371,7 @@ func (s *TicketService) isNodeComplete(node *model.FlowNode, ticket *model.Ticke
 		// 会签节点：需要所有审批人都通过
 		approverIDs := s.getApproverIDs(node, ticket)
 		var approvedCount int64
-		migrations.GetDB().Model(&model.ApprovalRecord{}).
+		global.GetDB().Model(&model.ApprovalRecord{}).
 			Where("ticket_id = ? AND node_id = ? AND result = ?", ticketID, node.ID, "approved").
 			Count(&approvedCount)
 		return int(approvedCount) >= len(approverIDs)
@@ -395,7 +395,7 @@ func (s *TicketService) getApproverIDs(node *model.FlowNode, ticket *model.Ticke
 		// 指定角色：获取该角色的所有用户
 		roleID, _ := strconv.ParseUint(node.ApproverValue, 10, 64)
 		var users []model.User
-		migrations.GetDB().Joins("JOIN user_roles ON users.id = user_roles.user_id").
+		global.GetDB().Joins("JOIN user_roles ON users.id = user_roles.user_id").
 			Where("user_roles.role_id = ?", roleID).Find(&users)
 		for _, u := range users {
 			approverIDs = append(approverIDs, u.ID)
@@ -430,7 +430,7 @@ func (s *TicketService) getNextNode(currentNode *model.FlowNode, ticket *model.T
 		branchID := s.evaluateCondition(currentNode, ticket)
 		if branchID != nil {
 			var nextNode model.FlowNode
-			if err := migrations.GetDB().First(&nextNode, *branchID).Error; err == nil {
+			if err := global.GetDB().First(&nextNode, *branchID).Error; err == nil {
 				return &nextNode
 			}
 		}
@@ -440,14 +440,14 @@ func (s *TicketService) getNextNode(currentNode *model.FlowNode, ticket *model.T
 	// 如果有明确的下一节点ID
 	if currentNode.NextNodeID != nil {
 		var nextNode model.FlowNode
-		if err := migrations.GetDB().First(&nextNode, *currentNode.NextNodeID).Error; err == nil {
+		if err := global.GetDB().First(&nextNode, *currentNode.NextNodeID).Error; err == nil {
 			return &nextNode
 		}
 	}
 
 	// 否则按顺序查找下一个非抄送节点
 	var nextNode model.FlowNode
-	if err := migrations.GetDB().Where("flow_id = ? AND sort_order > ?", currentNode.FlowID, currentNode.SortOrder).
+	if err := global.GetDB().Where("flow_id = ? AND sort_order > ?", currentNode.FlowID, currentNode.SortOrder).
 		Order("sort_order ASC").First(&nextNode).Error; err != nil {
 		return nil
 	}
@@ -515,7 +515,7 @@ func (s *TicketService) evaluateCondition(node *model.FlowNode, ticket *model.Ti
 // processCCNodes 处理流程开始时的抄送节点
 func (s *TicketService) processCCNodes(flowID uint, ticket *model.Ticket) {
 	var ccNodes []model.FlowNode
-	migrations.GetDB().Where("flow_id = ? AND node_type = ? AND sort_order = 0", flowID, model.FlowNodeTypeCC).Find(&ccNodes)
+	global.GetDB().Where("flow_id = ? AND node_type = ? AND sort_order = 0", flowID, model.FlowNodeTypeCC).Find(&ccNodes)
 	for _, node := range ccNodes {
 		s.processOneCCNode(&node, ticket)
 	}
@@ -533,7 +533,7 @@ func (s *TicketService) processOneCCNode(node *model.FlowNode, ticket *model.Tic
 			Action:     model.ApprovalActionCC,
 			Result:     "cc",
 		}
-		migrations.GetDB().Create(&record)
+		global.GetDB().Create(&record)
 	}
 	// 发送抄送通知
 	go s.notifySvc.NotifyTicketCC(ticket, ccUserIDs)
@@ -542,7 +542,7 @@ func (s *TicketService) processOneCCNode(node *model.FlowNode, ticket *model.Tic
 // Withdraw 撤回工单
 func (s *TicketService) Withdraw(id, userID uint) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().First(&ticket, id).Error; err != nil {
 		return err
 	}
 
@@ -558,14 +558,14 @@ func (s *TicketService) Withdraw(id, userID uint) error {
 
 	// 检查是否已经有审批记录（除了抄送）
 	var approvalCount int64
-	migrations.GetDB().Model(&model.ApprovalRecord{}).
+	global.GetDB().Model(&model.ApprovalRecord{}).
 		Where("ticket_id = ? AND action NOT IN ?", id, []string{model.ApprovalActionCC, model.ApprovalActionUrge}).
 		Count(&approvalCount)
 	if approvalCount > 0 {
 		return errors.New("工单已有审批记录，无法撤回")
 	}
 
-	return migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+	return global.GetDB().Model(&ticket).Updates(map[string]interface{}{
 		"status":          model.TicketStatusWithdrawn,
 		"current_node_id": nil,
 	}).Error
@@ -574,7 +574,7 @@ func (s *TicketService) Withdraw(id, userID uint) error {
 // Urge 催办工单
 func (s *TicketService) Urge(id, userID uint) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().Preload("CurrentNode").First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().Preload("CurrentNode").First(&ticket, id).Error; err != nil {
 		return err
 	}
 
@@ -593,7 +593,7 @@ func (s *TicketService) Urge(id, userID uint) error {
 		ApproverID: userID,
 		Action:     model.ApprovalActionUrge,
 	}
-	if err := migrations.GetDB().Create(&record).Error; err != nil {
+	if err := global.GetDB().Create(&record).Error; err != nil {
 		return err
 	}
 
@@ -607,7 +607,7 @@ func (s *TicketService) Urge(id, userID uint) error {
 // Transfer 转交工单
 func (s *TicketService) Transfer(id, userID, targetUserID uint) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().First(&ticket, id).Error; err != nil {
 		return err
 	}
 
@@ -616,13 +616,13 @@ func (s *TicketService) Transfer(id, userID, targetUserID uint) error {
 		return errors.New("只有处理中的工单可以转交")
 	}
 
-	return migrations.GetDB().Model(&ticket).Update("assignee_id", targetUserID).Error
+	return global.GetDB().Model(&ticket).Update("assignee_id", targetUserID).Error
 }
 
 // Return 退回工单
 func (s *TicketService) Return(id, approverID uint, comment string, toCreator bool) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().First(&ticket, id).Error; err != nil {
 		return err
 	}
 
@@ -643,13 +643,13 @@ func (s *TicketService) Return(id, approverID uint, comment string, toCreator bo
 		Result:     "returned",
 		Comment:    comment,
 	}
-	if err := migrations.GetDB().Create(&record).Error; err != nil {
+	if err := global.GetDB().Create(&record).Error; err != nil {
 		return err
 	}
 
 	if toCreator {
 		// 退回给发起人修改
-		return migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		return global.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status":          model.TicketStatusDraft,
 			"current_node_id": nil,
 		}).Error
@@ -657,28 +657,28 @@ func (s *TicketService) Return(id, approverID uint, comment string, toCreator bo
 
 	// 退回到上一节点
 	var currentNode model.FlowNode
-	if err := migrations.GetDB().First(&currentNode, *ticket.CurrentNodeID).Error; err != nil {
+	if err := global.GetDB().First(&currentNode, *ticket.CurrentNodeID).Error; err != nil {
 		return err
 	}
 
 	var prevNode model.FlowNode
-	if err := migrations.GetDB().Where("flow_id = ? AND sort_order < ? AND node_type NOT IN ?",
+	if err := global.GetDB().Where("flow_id = ? AND sort_order < ? AND node_type NOT IN ?",
 		currentNode.FlowID, currentNode.SortOrder, []string{model.FlowNodeTypeCC, model.FlowNodeTypeCondition}).
 		Order("sort_order DESC").First(&prevNode).Error; err != nil {
 		// 没有上一节点，退回给发起人
-		return migrations.GetDB().Model(&ticket).Updates(map[string]interface{}{
+		return global.GetDB().Model(&ticket).Updates(map[string]interface{}{
 			"status":          model.TicketStatusDraft,
 			"current_node_id": nil,
 		}).Error
 	}
 
-	return migrations.GetDB().Model(&ticket).Update("current_node_id", prevNode.ID).Error
+	return global.GetDB().Model(&ticket).Update("current_node_id", prevNode.ID).Error
 }
 
 // Delegate 转审工单
 func (s *TicketService) Delegate(id, approverID, targetUserID uint, comment string) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().First(&ticket, id).Error; err != nil {
 		return err
 	}
 
@@ -699,13 +699,13 @@ func (s *TicketService) Delegate(id, approverID, targetUserID uint, comment stri
 		Comment:      comment,
 		DelegateToID: &targetUserID,
 	}
-	return migrations.GetDB().Create(&record).Error
+	return global.GetDB().Create(&record).Error
 }
 
 // AddSign 加签
 func (s *TicketService) AddSign(id, approverID, targetUserID uint, comment string) error {
 	var ticket model.Ticket
-	if err := migrations.GetDB().First(&ticket, id).Error; err != nil {
+	if err := global.GetDB().First(&ticket, id).Error; err != nil {
 		return err
 	}
 
@@ -726,20 +726,20 @@ func (s *TicketService) AddSign(id, approverID, targetUserID uint, comment strin
 		Comment:      comment,
 		DelegateToID: &targetUserID,
 	}
-	return migrations.GetDB().Create(&record).Error
+	return global.GetDB().Create(&record).Error
 }
 
 // Complete 完成工单
 func (s *TicketService) Complete(id uint) error {
 	now := time.Now()
-	if err := migrations.GetDB().Model(&model.Ticket{}).Where("id = ?", id).Updates(map[string]interface{}{
+	if err := global.GetDB().Model(&model.Ticket{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"status":       model.TicketStatusCompleted,
 		"completed_at": &now,
 	}).Error; err != nil {
 		return err
 	}
 	var ticket model.Ticket
-	if migrations.GetDB().First(&ticket, id).Error == nil {
+	if global.GetDB().First(&ticket, id).Error == nil {
 		go s.notifySvc.NotifyTicketCompleted(&ticket)
 	}
 	return nil
@@ -747,7 +747,7 @@ func (s *TicketService) Complete(id uint) error {
 
 // Cancel 取消工单
 func (s *TicketService) Cancel(id uint) error {
-	return migrations.GetDB().Model(&model.Ticket{}).Where("id = ?", id).Update("status", model.TicketStatusCancelled).Error
+	return global.GetDB().Model(&model.Ticket{}).Where("id = ?", id).Update("status", model.TicketStatusCancelled).Error
 }
 
 // GetMyTickets 获取我创建的工单
@@ -762,7 +762,7 @@ func (s *TicketService) GetPendingApprovals(userID uint, page, pageSize int) ([]
 
 	// 获取用户的角色
 	var user model.User
-	if err := migrations.GetDB().Preload("Roles").First(&user, userID).Error; err != nil {
+	if err := global.GetDB().Preload("Roles").First(&user, userID).Error; err != nil {
 		return nil, 0, err
 	}
 
@@ -772,7 +772,7 @@ func (s *TicketService) GetPendingApprovals(userID uint, page, pageSize int) ([]
 	}
 
 	// 构建查询条件
-	db := migrations.GetDB().Model(&model.Ticket{}).
+	db := global.GetDB().Model(&model.Ticket{}).
 		Joins("JOIN flow_nodes ON tickets.current_node_id = flow_nodes.id").
 		Where("tickets.status IN ?", []string{model.TicketStatusPending, model.TicketStatusApproving})
 
@@ -816,11 +816,11 @@ func (s *TicketService) GetProcessedTickets(userID uint, page, pageSize int) ([]
 	var total int64
 
 	// 查找用户有审批记录的工单
-	subQuery := migrations.GetDB().Model(&model.ApprovalRecord{}).
+	subQuery := global.GetDB().Model(&model.ApprovalRecord{}).
 		Select("DISTINCT ticket_id").
 		Where("approver_id = ?", userID)
 
-	db := migrations.GetDB().Model(&model.Ticket{}).
+	db := global.GetDB().Model(&model.Ticket{}).
 		Where("id IN (?)", subQuery)
 
 	db.Count(&total)
@@ -839,11 +839,11 @@ func (s *TicketService) GetCCTickets(userID uint, page, pageSize int) ([]model.T
 	var total int64
 
 	// 查找抄送给用户的工单（通过审批记录中的 action = 'cc' 且 delegate_to_id = userID）
-	subQuery := migrations.GetDB().Model(&model.ApprovalRecord{}).
+	subQuery := global.GetDB().Model(&model.ApprovalRecord{}).
 		Select("DISTINCT ticket_id").
 		Where("delegate_to_id = ? AND action = ?", userID, model.ApprovalActionCC)
 
-	db := migrations.GetDB().Model(&model.Ticket{}).
+	db := global.GetDB().Model(&model.Ticket{}).
 		Where("id IN (?)", subQuery)
 
 	db.Count(&total)
@@ -859,7 +859,7 @@ func (s *TicketService) GetCCTickets(userID uint, page, pageSize int) ([]model.T
 // GetApprovalRecords 获取工单的审批记录
 func (s *TicketService) GetApprovalRecords(ticketID uint) ([]model.ApprovalRecord, error) {
 	var records []model.ApprovalRecord
-	if err := migrations.GetDB().Preload("Approver").Preload("Node").Preload("DelegateTo").
+	if err := global.GetDB().Preload("Approver").Preload("Node").Preload("DelegateTo").
 		Where("ticket_id = ?", ticketID).
 		Order("created_at ASC").
 		Find(&records).Error; err != nil {
@@ -871,7 +871,7 @@ func (s *TicketService) GetApprovalRecords(ticketID uint) ([]model.ApprovalRecor
 // CanUserApprove 检查用户是否可以审批该工单
 func (s *TicketService) CanUserApprove(ticketID, userID uint) (bool, error) {
 	var user model.User
-	if err := migrations.GetDB().Preload("Roles").First(&user, userID).Error; err == nil {
+	if err := global.GetDB().Preload("Roles").First(&user, userID).Error; err == nil {
 		for _, role := range user.Roles {
 			if role.Name == "admin" {
 				return true, nil
@@ -880,7 +880,7 @@ func (s *TicketService) CanUserApprove(ticketID, userID uint) (bool, error) {
 	}
 
 	var ticket model.Ticket
-	if err := migrations.GetDB().Preload("Data").Preload("Data.Field").First(&ticket, ticketID).Error; err != nil {
+	if err := global.GetDB().Preload("Data").Preload("Data.Field").First(&ticket, ticketID).Error; err != nil {
 		return false, err
 	}
 
@@ -890,13 +890,13 @@ func (s *TicketService) CanUserApprove(ticketID, userID uint) (bool, error) {
 
 	// 获取当前审批节点
 	var node model.FlowNode
-	if err := migrations.GetDB().First(&node, *ticket.CurrentNodeID).Error; err != nil {
+	if err := global.GetDB().First(&node, *ticket.CurrentNodeID).Error; err != nil {
 		return false, err
 	}
 
 	// 检查是否有转审给该用户
 	var delegateCount int64
-	migrations.GetDB().Model(&model.ApprovalRecord{}).
+	global.GetDB().Model(&model.ApprovalRecord{}).
 		Where("ticket_id = ? AND node_id = ? AND action = ? AND delegate_to_id = ?",
 			ticketID, node.ID, model.ApprovalActionDelegate, userID).
 		Count(&delegateCount)
@@ -906,7 +906,7 @@ func (s *TicketService) CanUserApprove(ticketID, userID uint) (bool, error) {
 
 	// 检查是否有加签给该用户
 	var addSignCount int64
-	migrations.GetDB().Model(&model.ApprovalRecord{}).
+	global.GetDB().Model(&model.ApprovalRecord{}).
 		Where("ticket_id = ? AND node_id = ? AND action = ? AND delegate_to_id = ?",
 			ticketID, node.ID, model.ApprovalActionAddSign, userID).
 		Count(&addSignCount)
@@ -928,7 +928,7 @@ func (s *TicketService) CanUserApprove(ticketID, userID uint) (bool, error) {
 // SaveTicketData 保存工单表单数据
 func (s *TicketService) SaveTicketData(ticketID uint, data []model.TicketData) error {
 	// 删除旧数据
-	if err := migrations.GetDB().Where("ticket_id = ?", ticketID).Delete(&model.TicketData{}).Error; err != nil {
+	if err := global.GetDB().Where("ticket_id = ?", ticketID).Delete(&model.TicketData{}).Error; err != nil {
 		return err
 	}
 
@@ -937,7 +937,7 @@ func (s *TicketService) SaveTicketData(ticketID uint, data []model.TicketData) e
 		data[i].TicketID = ticketID
 	}
 	if len(data) > 0 {
-		return migrations.GetDB().Create(&data).Error
+		return global.GetDB().Create(&data).Error
 	}
 	return nil
 }

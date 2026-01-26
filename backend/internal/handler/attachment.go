@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 )
 
 type AttachmentHandler struct {

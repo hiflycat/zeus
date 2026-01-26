@@ -3,10 +3,12 @@ package handler
 import (
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"backend/internal/model"
+	"backend/internal/model/request"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // RoleHandler 角色处理器
@@ -85,22 +87,19 @@ func (h *RoleHandler) GetByID(c *gin.Context) {
 
 // List 获取角色列表
 func (h *RoleHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	keyword := c.Query("keyword")
+	var req request.ListRoleRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
-	roles, total, err := h.roleService.List(page, pageSize, keyword)
+	roles, total, err := h.roleService.List(req.GetPage(), req.GetPageSize(), req.Keyword)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{
-		"list":      roles,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.Success(c, response.NewPageResponse(roles, total, req.GetPage(), req.GetPageSize()))
 }
 
 // AssignPolicies 分配 API 权限
@@ -108,9 +107,7 @@ func (h *RoleHandler) AssignPolicies(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	roleID := uint(id)
 
-	var req struct {
-		APIDefIDs []uint `json:"api_def_ids"`
-	}
+	var req request.AssignPoliciesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -143,9 +140,7 @@ func (h *RoleHandler) AssignMenus(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
 	roleID := uint(id)
 
-	var req struct {
-		MenuIDs []uint `json:"menu_ids" binding:"required"`
-	}
+	var req request.AssignMenusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return

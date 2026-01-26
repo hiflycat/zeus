@@ -1,9 +1,9 @@
 package handler
 
 import (
+	"backend/internal/global"
 	"backend/internal/model"
-	"backend/migrations"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,7 +23,7 @@ func (h *TicketStatsHandler) GetStats(c *gin.Context) {
 		ByPriority map[int]int64    `json:"by_priority"`
 	}
 
-	db := migrations.GetDB()
+	db := global.GetDB()
 
 	// 总数
 	db.Model(&model.Ticket{}).Count(&stats.Total)

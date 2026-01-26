@@ -1,10 +1,11 @@
-package migrations
+package core
 
 import (
 	"errors"
 	"strconv"
 
 	casbinPkg "backend/internal/casbin"
+	"backend/internal/global"
 	"backend/internal/model"
 	"backend/pkg/utils"
 	"gorm.io/gorm"
@@ -14,7 +15,7 @@ import (
 func Seed() error {
 	// 检查是否已经初始化过
 	var count int64
-	if err := db.Model(&model.User{}).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.User{}).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
@@ -28,7 +29,7 @@ func Seed() error {
 		Description: "拥有所有权限的超级管理员",
 		Status:      1,
 	}
-	if err := db.FirstOrCreate(&superAdminRole, model.Role{Name: "admin"}).Error; err != nil {
+	if err := global.GetDB().FirstOrCreate(&superAdminRole, model.Role{Name: "admin"}).Error; err != nil {
 		return err
 	}
 
@@ -45,12 +46,12 @@ func Seed() error {
 		Status:   1,
 	}
 
-	if err := db.FirstOrCreate(&adminUser, model.User{Username: "admin"}).Error; err != nil {
+	if err := global.GetDB().FirstOrCreate(&adminUser, model.User{Username: "admin"}).Error; err != nil {
 		return err
 	}
 
 	// 将超级管理员角色分配给管理员用户
-	if err := db.Model(&adminUser).Association("Roles").Replace([]model.Role{superAdminRole}); err != nil {
+	if err := global.GetDB().Model(&adminUser).Association("Roles").Replace([]model.Role{superAdminRole}); err != nil {
 		return err
 	}
 
@@ -60,7 +61,7 @@ func Seed() error {
 		Description: "普通工单用户，可创建、查看和审批工单",
 		Status:      1,
 	}
-	if err := db.FirstOrCreate(&ticketUserRole, model.Role{Name: "ticket_user"}).Error; err != nil {
+	if err := global.GetDB().FirstOrCreate(&ticketUserRole, model.Role{Name: "ticket_user"}).Error; err != nil {
 		return err
 	}
 
@@ -77,12 +78,12 @@ func Seed() error {
 		Status:   1,
 	}
 
-	if err := db.FirstOrCreate(&normalUser, model.User{Username: "user"}).Error; err != nil {
+	if err := global.GetDB().FirstOrCreate(&normalUser, model.User{Username: "user"}).Error; err != nil {
 		return err
 	}
 
 	// 将普通用户角色分配给普通用户
-	if err := db.Model(&normalUser).Association("Roles").Replace([]model.Role{ticketUserRole}); err != nil {
+	if err := global.GetDB().Model(&normalUser).Association("Roles").Replace([]model.Role{ticketUserRole}); err != nil {
 		return err
 	}
 
@@ -232,7 +233,7 @@ func SyncAPIDefinitions() error {
 	}
 
 	for _, apiDef := range apiDefs {
-		if err := db.FirstOrCreate(&apiDef, model.APIDefinition{Path: apiDef.Path, Method: apiDef.Method}).Error; err != nil {
+		if err := global.GetDB().FirstOrCreate(&apiDef, model.APIDefinition{Path: apiDef.Path, Method: apiDef.Method}).Error; err != nil {
 			return err
 		}
 	}
@@ -248,13 +249,13 @@ func SyncCasbinPolicies() error {
 	}
 
 	var superAdminRole model.Role
-	if err := db.Where("name = ?", "admin").First(&superAdminRole).Error; err != nil {
+	if err := global.GetDB().Where("name = ?", "admin").First(&superAdminRole).Error; err != nil {
 		return nil
 	}
 
 	// 获取所有 API 定义
 	var apiDefs []model.APIDefinition
-	if err := db.Find(&apiDefs).Error; err != nil {
+	if err := global.GetDB().Find(&apiDefs).Error; err != nil {
 		return err
 	}
 
@@ -276,7 +277,7 @@ func SyncTicketUserPolicies() error {
 	}
 
 	var ticketUserRole model.Role
-	if err := db.Where("name = ?", "ticket_user").First(&ticketUserRole).Error; err != nil {
+	if err := global.GetDB().Where("name = ?", "ticket_user").First(&ticketUserRole).Error; err != nil {
 		return nil // 角色不存在，跳过
 	}
 
@@ -327,10 +328,10 @@ func SyncTicketUserPolicies() error {
 
 	// 为角色分配工单相关菜单
 	var ticketMenu model.Menu
-	if err := db.Where("path = ?", "/ticket").First(&ticketMenu).Error; err == nil {
+	if err := global.GetDB().Where("path = ?", "/ticket").First(&ticketMenu).Error; err == nil {
 		var ticketListMenu model.Menu
-		if err := db.Where("path = ?", "/ticket/list").First(&ticketListMenu).Error; err == nil {
-			db.Model(&ticketUserRole).Association("Menus").Replace([]model.Menu{ticketMenu, ticketListMenu})
+		if err := global.GetDB().Where("path = ?", "/ticket/list").First(&ticketListMenu).Error; err == nil {
+			global.GetDB().Model(&ticketUserRole).Association("Menus").Replace([]model.Menu{ticketMenu, ticketListMenu})
 		}
 	}
 
@@ -356,7 +357,7 @@ func SyncSystemConfigs() error {
 
 	for _, config := range systemConfigs {
 		// 只在配置不存在时创建，不覆盖已有配置
-		if err := db.Where("`key` = ?", config.Key).FirstOrCreate(&config).Error; err != nil {
+		if err := global.GetDB().Where("`key` = ?", config.Key).FirstOrCreate(&config).Error; err != nil {
 			return err
 		}
 	}
@@ -369,16 +370,16 @@ func SyncMenus() error {
 	// 辅助函数：创建或更新菜单
 	upsertMenu := func(menu *model.Menu) error {
 		var existing model.Menu
-		if err := db.Where("path = ?", menu.Path).First(&existing).Error; err != nil {
+		if err := global.GetDB().Where("path = ?", menu.Path).First(&existing).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				// 不存在，创建新菜单
-				return db.Create(menu).Error
+				return global.GetDB().Create(menu).Error
 			}
 			return err
 		}
 		// 已存在，更新并保留 ID
 		menu.ID = existing.ID
-		return db.Model(&existing).Updates(map[string]any{
+		return global.GetDB().Model(&existing).Updates(map[string]any{
 			"name":      menu.Name,
 			"icon":      menu.Icon,
 			"component": menu.Component,
@@ -490,14 +491,14 @@ func SyncMenus() error {
 
 	// 将所有菜单分配给超级管理员角色
 	var superAdminRole model.Role
-	if err := db.Where("name = ?", "admin").First(&superAdminRole).Error; err != nil {
+	if err := global.GetDB().Where("name = ?", "admin").First(&superAdminRole).Error; err != nil {
 		return nil // 角色不存在，跳过
 	}
 
 	var allMenus []model.Menu
-	if err := db.Find(&allMenus).Error; err != nil {
+	if err := global.GetDB().Find(&allMenus).Error; err != nil {
 		return err
 	}
 
-	return db.Model(&superAdminRole).Association("Menus").Replace(allMenus)
+	return global.GetDB().Model(&superAdminRole).Association("Menus").Replace(allMenus)
 }

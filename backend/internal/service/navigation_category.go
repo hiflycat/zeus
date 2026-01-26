@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 	"gorm.io/gorm"
 )
 
@@ -22,7 +22,7 @@ func (s *NavigationCategoryService) Create(category *model.NavigationCategory) e
 	// 如果指定了父分类，检查父分类是否存在
 	if category.ParentID != nil {
 		var parentCategory model.NavigationCategory
-		if err := migrations.GetDB().Where("id = ?", *category.ParentID).First(&parentCategory).Error; err != nil {
+		if err := global.GetDB().Where("id = ?", *category.ParentID).First(&parentCategory).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("父分类不存在")
 			}
@@ -30,13 +30,13 @@ func (s *NavigationCategoryService) Create(category *model.NavigationCategory) e
 		}
 	}
 
-	return migrations.GetDB().Create(category).Error
+	return global.GetDB().Create(category).Error
 }
 
 // Update 更新网站分类
 func (s *NavigationCategoryService) Update(categoryID uint, category *model.NavigationCategory) error {
 	var existingCategory model.NavigationCategory
-	if err := migrations.GetDB().Where("id = ?", categoryID).First(&existingCategory).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", categoryID).First(&existingCategory).Error; err != nil {
 		return err
 	}
 
@@ -46,7 +46,7 @@ func (s *NavigationCategoryService) Update(categoryID uint, category *model.Navi
 			return errors.New("不能将自己设为父分类")
 		}
 		var parentCategory model.NavigationCategory
-		if err := migrations.GetDB().Where("id = ?", *category.ParentID).First(&parentCategory).Error; err != nil {
+		if err := global.GetDB().Where("id = ?", *category.ParentID).First(&parentCategory).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("父分类不存在")
 			}
@@ -55,19 +55,19 @@ func (s *NavigationCategoryService) Update(categoryID uint, category *model.Navi
 	}
 
 	// 使用 Select 明确指定要更新的字段
-	return migrations.GetDB().Model(&existingCategory).Select("name", "description", "icon", "parent_id", "sort").Updates(category).Error
+	return global.GetDB().Model(&existingCategory).Select("name", "description", "icon", "parent_id", "sort").Updates(category).Error
 }
 
 // Delete 删除网站分类
 func (s *NavigationCategoryService) Delete(categoryID uint) error {
 	var category model.NavigationCategory
-	if err := migrations.GetDB().Where("id = ?", categoryID).First(&category).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", categoryID).First(&category).Error; err != nil {
 		return err
 	}
 
 	// 检查是否有子分类
 	var count int64
-	if err := migrations.GetDB().Model(&model.NavigationCategory{}).Where("parent_id = ?", categoryID).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.NavigationCategory{}).Where("parent_id = ?", categoryID).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
@@ -75,20 +75,20 @@ func (s *NavigationCategoryService) Delete(categoryID uint) error {
 	}
 
 	// 检查是否有网站使用此分类
-	if err := migrations.GetDB().Model(&model.Navigation{}).Where("category_id = ?", categoryID).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.Navigation{}).Where("category_id = ?", categoryID).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return errors.New("该分类下有网站，无法删除")
 	}
 
-	return migrations.GetDB().Delete(&category).Error
+	return global.GetDB().Delete(&category).Error
 }
 
 // GetByID 根据 ID 获取网站分类
 func (s *NavigationCategoryService) GetByID(categoryID uint) (*model.NavigationCategory, error) {
 	var category model.NavigationCategory
-	if err := migrations.GetDB().Where("id = ?", categoryID).First(&category).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", categoryID).First(&category).Error; err != nil {
 		return nil, err
 	}
 	return &category, nil
@@ -98,7 +98,7 @@ func (s *NavigationCategoryService) GetByID(categoryID uint) (*model.NavigationC
 func (s *NavigationCategoryService) GetAll(keyword string) ([]model.NavigationCategory, error) {
 	var categories []model.NavigationCategory
 
-	query := migrations.GetDB().Model(&model.NavigationCategory{})
+	query := global.GetDB().Model(&model.NavigationCategory{})
 
 	// 搜索
 	if keyword != "" {
@@ -170,7 +170,7 @@ func (s *NavigationCategoryService) List(page, pageSize int, keyword string) ([]
 	var categories []model.NavigationCategory
 	var total int64
 
-	query := migrations.GetDB().Model(&model.NavigationCategory{})
+	query := global.GetDB().Model(&model.NavigationCategory{})
 
 	// 搜索
 	if keyword != "" {

@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 )
 
 // APIDefinitionService API 定义服务
@@ -18,25 +18,25 @@ func NewAPIDefinitionService() *APIDefinitionService {
 // Create 创建 API 定义
 func (s *APIDefinitionService) Create(apiDef *model.APIDefinition) error {
 	var count int64
-	if err := migrations.GetDB().Model(&model.APIDefinition{}).Where("path = ? AND method = ?", apiDef.Path, apiDef.Method).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.APIDefinition{}).Where("path = ? AND method = ?", apiDef.Path, apiDef.Method).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return errors.New("该 API 路径和请求方法的组合已存在")
 	}
-	return migrations.GetDB().Create(apiDef).Error
+	return global.GetDB().Create(apiDef).Error
 }
 
 // Update 更新 API 定义
 func (s *APIDefinitionService) Update(id uint, apiDef *model.APIDefinition) error {
 	var existing model.APIDefinition
-	if err := migrations.GetDB().Where("id = ?", id).First(&existing).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", id).First(&existing).Error; err != nil {
 		return err
 	}
 
 	if apiDef.Path != existing.Path || apiDef.Method != existing.Method {
 		var count int64
-		if err := migrations.GetDB().Model(&model.APIDefinition{}).Where("path = ? AND method = ? AND id != ?", apiDef.Path, apiDef.Method, id).Count(&count).Error; err != nil {
+		if err := global.GetDB().Model(&model.APIDefinition{}).Where("path = ? AND method = ? AND id != ?", apiDef.Path, apiDef.Method, id).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
@@ -44,22 +44,22 @@ func (s *APIDefinitionService) Update(id uint, apiDef *model.APIDefinition) erro
 		}
 	}
 
-	return migrations.GetDB().Model(&existing).Updates(apiDef).Error
+	return global.GetDB().Model(&existing).Updates(apiDef).Error
 }
 
 // Delete 删除 API 定义
 func (s *APIDefinitionService) Delete(id uint) error {
 	var apiDef model.APIDefinition
-	if err := migrations.GetDB().Where("id = ?", id).First(&apiDef).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", id).First(&apiDef).Error; err != nil {
 		return err
 	}
-	return migrations.GetDB().Delete(&apiDef).Error
+	return global.GetDB().Delete(&apiDef).Error
 }
 
 // GetByID 根据 ID 获取 API 定义
 func (s *APIDefinitionService) GetByID(id uint) (*model.APIDefinition, error) {
 	var apiDef model.APIDefinition
-	if err := migrations.GetDB().Where("id = ?", id).First(&apiDef).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", id).First(&apiDef).Error; err != nil {
 		return nil, err
 	}
 	return &apiDef, nil
@@ -70,7 +70,7 @@ func (s *APIDefinitionService) List(page, pageSize int, keyword, resource string
 	var apiDefs []model.APIDefinition
 	var total int64
 
-	query := migrations.GetDB().Model(&model.APIDefinition{})
+	query := global.GetDB().Model(&model.APIDefinition{})
 
 	if keyword != "" {
 		query = query.Where("name LIKE ? OR path LIKE ?", "%"+keyword+"%", "%"+keyword+"%")
@@ -94,7 +94,7 @@ func (s *APIDefinitionService) List(page, pageSize int, keyword, resource string
 // GetResources 获取所有资源类型
 func (s *APIDefinitionService) GetResources() ([]string, error) {
 	var resources []string
-	if err := migrations.GetDB().Model(&model.APIDefinition{}).Distinct("resource").Pluck("resource", &resources).Error; err != nil {
+	if err := global.GetDB().Model(&model.APIDefinition{}).Distinct("resource").Pluck("resource", &resources).Error; err != nil {
 		return nil, err
 	}
 	return resources, nil
@@ -103,7 +103,7 @@ func (s *APIDefinitionService) GetResources() ([]string, error) {
 // GetAll 获取所有 API 定义（用于角色分配）
 func (s *APIDefinitionService) GetAll() ([]model.APIDefinition, error) {
 	var apiDefs []model.APIDefinition
-	if err := migrations.GetDB().Find(&apiDefs).Error; err != nil {
+	if err := global.GetDB().Find(&apiDefs).Error; err != nil {
 		return nil, err
 	}
 	return apiDefs, nil

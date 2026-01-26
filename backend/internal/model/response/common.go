@@ -27,6 +27,27 @@ const (
 	CodeInternalError = 500
 )
 
+// PageResponse 通用分页响应（使用泛型）
+type PageResponse[T any] struct {
+	List     []T   `json:"list"`
+	Total    int64 `json:"total"`
+	Page     int   `json:"page"`
+	PageSize int   `json:"page_size"`
+}
+
+// NewPageResponse 创建分页响应
+func NewPageResponse[T any](list []T, total int64, page, pageSize int) *PageResponse[T] {
+	if list == nil {
+		list = make([]T, 0)
+	}
+	return &PageResponse[T]{
+		List:     list,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}
+}
+
 // Success 成功响应
 func Success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{

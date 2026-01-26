@@ -3,10 +3,11 @@ package handler
 import (
 	"strconv"
 
+	"backend/internal/global"
 	"backend/internal/model"
+	"backend/internal/model/request"
+	"backend/internal/model/response"
 	"backend/internal/service"
-	"backend/migrations"
-	"backend/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -21,7 +22,7 @@ func NewTicketHandler() *TicketHandler {
 
 func isAdminUser(userID uint) bool {
 	var user model.User
-	if err := migrations.GetDB().Preload("Roles").Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := global.GetDB().Preload("Roles").Where("id = ?", userID).First(&user).Error; err != nil {
 		return false
 	}
 	for _, role := range user.Roles {
@@ -33,23 +34,27 @@ func isAdminUser(userID uint) bool {
 }
 
 func (h *TicketHandler) Create(c *gin.Context) {
-	var req struct {
-		model.Ticket
-		FormData map[string]interface{} `json:"form_data"`
-	}
+	var req request.CreateTicketRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
 	userID, _ := c.Get("user_id")
-	req.CreatorID = userID.(uint)
-	req.Status = model.TicketStatusDraft
 
-	if err := h.svc.CreateWithFormData(&req.Ticket, req.FormData); err != nil {
+	ticket := model.Ticket{
+		Title:       req.Title,
+		Description: req.Description,
+		TypeID:      req.TypeID,
+		Priority:    req.Priority,
+		CreatorID:   userID.(uint),
+		Status:      model.TicketStatusDraft,
+	}
+
+	if err := h.svc.CreateWithFormData(&ticket, req.FormData); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	response.Success(c, req.Ticket)
+	response.Success(c, ticket)
 }
 
 func (h *TicketHandler) Update(c *gin.Context) {
@@ -88,12 +93,11 @@ func (h *TicketHandler) GetByID(c *gin.Context) {
 }
 
 func (h *TicketHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	keyword := c.Query("keyword")
-	status := c.Query("status")
-	typeID, _ := strconv.ParseUint(c.Query("type_id"), 10, 32)
-	creatorID, _ := strconv.ParseUint(c.Query("creator_id"), 10, 32)
+	var req request.ListTicketRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
 	userID, _ := c.Get("user_id")
 	var user model.User
@@ -101,7 +105,7 @@ func (h *TicketHandler) List(c *gin.Context) {
 	if userID != nil {
 		isAdmin = isAdminUser(userID.(uint))
 		if !isAdmin {
-			_ = migrations.GetDB().Where("id = ?", userID).First(&user).Error
+			_ = global.GetDB().Where("id = ?", userID).First(&user).Error
 		}
 	}
 
@@ -111,15 +115,15 @@ func (h *TicketHandler) List(c *gin.Context) {
 		err     error
 	)
 	if isAdmin {
-		tickets, total, err = h.svc.List(page, pageSize, keyword, status, uint(typeID), uint(creatorID))
+		tickets, total, err = h.svc.List(req.GetPage(), req.GetPageSize(), req.Keyword, req.Status, req.TypeID, req.CreatorID)
 	} else {
-		tickets, total, err = h.svc.ListForUser(user.ID, page, pageSize, keyword, status, uint(typeID))
+		tickets, total, err = h.svc.ListForUser(user.ID, req.GetPage(), req.GetPageSize(), req.Keyword, req.Status, req.TypeID)
 	}
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"list": tickets, "total": total, "page": page, "page_size": pageSize})
+	response.Success(c, response.NewPageResponse(tickets, total, req.GetPage(), req.GetPageSize()))
 }
 
 func (h *TicketHandler) Submit(c *gin.Context) {
@@ -133,10 +137,7 @@ func (h *TicketHandler) Submit(c *gin.Context) {
 
 func (h *TicketHandler) Approve(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req struct {
-		Approved bool   `json:"approved"`
-		Comment  string `json:"comment"`
-	}
+	var req request.ApproveRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -183,57 +184,69 @@ func (h *TicketHandler) Cancel(c *gin.Context) {
 }
 
 func (h *TicketHandler) GetMyTickets(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	var req request.PageRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	userID, _ := c.Get("user_id")
 
-	tickets, total, err := h.svc.GetMyTickets(userID.(uint), page, pageSize)
+	tickets, total, err := h.svc.GetMyTickets(userID.(uint), req.GetPage(), req.GetPageSize())
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"list": tickets, "total": total, "page": page, "page_size": pageSize})
+	response.Success(c, response.NewPageResponse(tickets, total, req.GetPage(), req.GetPageSize()))
 }
 
 func (h *TicketHandler) GetPendingApprovals(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	var req request.PageRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	userID, _ := c.Get("user_id")
 
-	tickets, total, err := h.svc.GetPendingApprovals(userID.(uint), page, pageSize)
+	tickets, total, err := h.svc.GetPendingApprovals(userID.(uint), req.GetPage(), req.GetPageSize())
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"list": tickets, "total": total, "page": page, "page_size": pageSize})
+	response.Success(c, response.NewPageResponse(tickets, total, req.GetPage(), req.GetPageSize()))
 }
 
 // GetProcessedTickets 获取我处理过的工单
 func (h *TicketHandler) GetProcessedTickets(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	var req request.PageRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	userID, _ := c.Get("user_id")
 
-	tickets, total, err := h.svc.GetProcessedTickets(userID.(uint), page, pageSize)
+	tickets, total, err := h.svc.GetProcessedTickets(userID.(uint), req.GetPage(), req.GetPageSize())
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"list": tickets, "total": total, "page": page, "page_size": pageSize})
+	response.Success(c, response.NewPageResponse(tickets, total, req.GetPage(), req.GetPageSize()))
 }
 
 // GetCCTickets 获取抄送我的工单
 func (h *TicketHandler) GetCCTickets(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	var req request.PageRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 	userID, _ := c.Get("user_id")
 
-	tickets, total, err := h.svc.GetCCTickets(userID.(uint), page, pageSize)
+	tickets, total, err := h.svc.GetCCTickets(userID.(uint), req.GetPage(), req.GetPageSize())
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"list": tickets, "total": total, "page": page, "page_size": pageSize})
+	response.Success(c, response.NewPageResponse(tickets, total, req.GetPage(), req.GetPageSize()))
 }
 
 // Withdraw 撤回工单
@@ -261,9 +274,7 @@ func (h *TicketHandler) Urge(c *gin.Context) {
 // Transfer 转交工单
 func (h *TicketHandler) Transfer(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req struct {
-		TargetUserID uint `json:"target_user_id" binding:"required"`
-	}
+	var req request.TransferRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -279,10 +290,7 @@ func (h *TicketHandler) Transfer(c *gin.Context) {
 // Return 退回工单
 func (h *TicketHandler) Return(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req struct {
-		Comment   string `json:"comment"`
-		ToCreator bool   `json:"to_creator"`
-	}
+	var req request.ReturnRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -310,10 +318,7 @@ func (h *TicketHandler) Return(c *gin.Context) {
 // Delegate 转审工单
 func (h *TicketHandler) Delegate(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req struct {
-		TargetUserID uint   `json:"target_user_id" binding:"required"`
-		Comment      string `json:"comment"`
-	}
+	var req request.DelegateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -341,10 +346,7 @@ func (h *TicketHandler) Delegate(c *gin.Context) {
 // AddSign 加签
 func (h *TicketHandler) AddSign(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req struct {
-		TargetUserID uint   `json:"target_user_id" binding:"required"`
-		Comment      string `json:"comment"`
-	}
+	var req request.AddSignRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return

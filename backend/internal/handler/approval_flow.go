@@ -4,8 +4,9 @@ import (
 	"strconv"
 
 	"backend/internal/model"
+	"backend/internal/model/request"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -65,15 +66,17 @@ func (h *ApprovalFlowHandler) GetFlowByID(c *gin.Context) {
 }
 
 func (h *ApprovalFlowHandler) ListFlows(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	keyword := c.Query("keyword")
-	flows, total, err := h.svc.ListFlows(page, pageSize, keyword)
+	var req request.ListApprovalFlowRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	flows, total, err := h.svc.ListFlows(req.GetPage(), req.GetPageSize(), req.Keyword)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"list": flows, "total": total, "page": page, "page_size": pageSize})
+	response.Success(c, response.NewPageResponse(flows, total, req.GetPage(), req.GetPageSize()))
 }
 
 func (h *ApprovalFlowHandler) ListEnabledFlows(c *gin.Context) {
@@ -112,15 +115,21 @@ func (h *ApprovalFlowHandler) SaveNodes(c *gin.Context) {
 // SaveNodesWithConnections 保存节点及连线（用于可视化编辑器）
 func (h *ApprovalFlowHandler) SaveNodesWithConnections(c *gin.Context) {
 	flowID, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req struct {
-		Nodes       []model.FlowNode             `json:"nodes"`
-		Connections []service.NodeConnection     `json:"connections"`
-	}
+	var req request.SaveNodesWithConnectionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}
-	if err := h.svc.SaveNodesWithConnections(uint(flowID), req.Nodes, req.Connections); err != nil {
+	// 转换为 service 层的 NodeConnection 类型
+	connections := make([]service.NodeConnection, len(req.Connections))
+	for i, conn := range req.Connections {
+		connections[i] = service.NodeConnection{
+			SourceID:     conn.Source,
+			TargetID:     conn.Target,
+			SourceHandle: conn.SourceHandle,
+		}
+	}
+	if err := h.svc.SaveNodesWithConnections(uint(flowID), req.Nodes, connections); err != nil {
 		response.BadRequest(c, err.Error())
 		return
 	}

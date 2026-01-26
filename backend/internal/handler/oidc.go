@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 )
 
 // OIDCHandler OIDC 认证处理器

@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 )
 
 type ApprovalFlowService struct{}
@@ -15,11 +15,11 @@ func NewApprovalFlowService() *ApprovalFlowService {
 
 func (s *ApprovalFlowService) CreateFlow(flow *model.ApprovalFlow) error {
 	flow.Version = 1
-	return migrations.GetDB().Create(flow).Error
+	return global.GetDB().Create(flow).Error
 }
 
 func (s *ApprovalFlowService) UpdateFlow(id uint, flow *model.ApprovalFlow) error {
-	return migrations.GetDB().Model(&model.ApprovalFlow{}).Where("id = ?", id).Updates(map[string]interface{}{
+	return global.GetDB().Model(&model.ApprovalFlow{}).Where("id = ?", id).Updates(map[string]interface{}{
 		"name":        flow.Name,
 		"description": flow.Description,
 		"enabled":     flow.Enabled,
@@ -29,22 +29,22 @@ func (s *ApprovalFlowService) UpdateFlow(id uint, flow *model.ApprovalFlow) erro
 func (s *ApprovalFlowService) DeleteFlow(id uint) error {
 	// 检查是否有工单正在使用该流程
 	var count int64
-	migrations.GetDB().Model(&model.Ticket{}).Where("flow_id = ? AND status IN ?", id,
+	global.GetDB().Model(&model.Ticket{}).Where("flow_id = ? AND status IN ?", id,
 		[]string{model.TicketStatusPending, model.TicketStatusApproving}).Count(&count)
 	if count > 0 {
 		return errors.New("该流程正在被使用，无法删除")
 	}
 
 	// 删除流程节点
-	if err := migrations.GetDB().Where("flow_id = ?", id).Delete(&model.FlowNode{}).Error; err != nil {
+	if err := global.GetDB().Where("flow_id = ?", id).Delete(&model.FlowNode{}).Error; err != nil {
 		return err
 	}
-	return migrations.GetDB().Delete(&model.ApprovalFlow{}, id).Error
+	return global.GetDB().Delete(&model.ApprovalFlow{}, id).Error
 }
 
 func (s *ApprovalFlowService) GetFlowByID(id uint) (*model.ApprovalFlow, error) {
 	var flow model.ApprovalFlow
-	if err := migrations.GetDB().Preload("Nodes").First(&flow, id).Error; err != nil {
+	if err := global.GetDB().Preload("Nodes").First(&flow, id).Error; err != nil {
 		return nil, err
 	}
 	return &flow, nil
@@ -53,7 +53,7 @@ func (s *ApprovalFlowService) GetFlowByID(id uint) (*model.ApprovalFlow, error) 
 func (s *ApprovalFlowService) ListFlows(page, pageSize int, keyword string) ([]model.ApprovalFlow, int64, error) {
 	var flows []model.ApprovalFlow
 	var total int64
-	db := migrations.GetDB().Model(&model.ApprovalFlow{})
+	db := global.GetDB().Model(&model.ApprovalFlow{})
 
 	if keyword != "" {
 		db = db.Where("name LIKE ?", "%"+keyword+"%")
@@ -69,7 +69,7 @@ func (s *ApprovalFlowService) ListFlows(page, pageSize int, keyword string) ([]m
 
 func (s *ApprovalFlowService) ListEnabledFlows() ([]model.ApprovalFlow, error) {
 	var flows []model.ApprovalFlow
-	if err := migrations.GetDB().Where("enabled = ?", true).Order("name ASC").Find(&flows).Error; err != nil {
+	if err := global.GetDB().Where("enabled = ?", true).Order("name ASC").Find(&flows).Error; err != nil {
 		return nil, err
 	}
 	return flows, nil
@@ -77,7 +77,7 @@ func (s *ApprovalFlowService) ListEnabledFlows() ([]model.ApprovalFlow, error) {
 
 func (s *ApprovalFlowService) GetNodesByFlowID(flowID uint) ([]model.FlowNode, error) {
 	var nodes []model.FlowNode
-	if err := migrations.GetDB().Where("flow_id = ?", flowID).Order("sort_order ASC").Find(&nodes).Error; err != nil {
+	if err := global.GetDB().Where("flow_id = ?", flowID).Order("sort_order ASC").Find(&nodes).Error; err != nil {
 		return nil, err
 	}
 	return nodes, nil
@@ -85,7 +85,7 @@ func (s *ApprovalFlowService) GetNodesByFlowID(flowID uint) ([]model.FlowNode, e
 
 func (s *ApprovalFlowService) SaveNodes(flowID uint, nodes []model.FlowNode) error {
 	// 开启事务
-	tx := migrations.GetDB().Begin()
+	tx := global.GetDB().Begin()
 
 	// 删除旧节点
 	if err := tx.Where("flow_id = ?", flowID).Delete(&model.FlowNode{}).Error; err != nil {
@@ -131,7 +131,7 @@ func (s *ApprovalFlowService) SaveNodes(flowID uint, nodes []model.FlowNode) err
 
 // SaveNodesWithConnections 保存节点及连线关系（用于可视化编辑器）
 func (s *ApprovalFlowService) SaveNodesWithConnections(flowID uint, nodes []model.FlowNode, connections []NodeConnection) error {
-	tx := migrations.GetDB().Begin()
+	tx := global.GetDB().Begin()
 
 	// 删除旧节点
 	if err := tx.Where("flow_id = ?", flowID).Delete(&model.FlowNode{}).Error; err != nil {
@@ -200,8 +200,8 @@ type NodeConnection struct {
 // PublishFlow 发布新版本（增加版本号）
 func (s *ApprovalFlowService) PublishFlow(id uint) error {
 	var flow model.ApprovalFlow
-	if err := migrations.GetDB().First(&flow, id).Error; err != nil {
+	if err := global.GetDB().First(&flow, id).Error; err != nil {
 		return err
 	}
-	return migrations.GetDB().Model(&flow).Update("version", flow.Version+1).Error
+	return global.GetDB().Model(&flow).Update("version", flow.Version+1).Error
 }

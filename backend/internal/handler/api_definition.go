@@ -4,8 +4,10 @@ import (
 	"strconv"
 
 	"backend/internal/model"
+	"backend/internal/model/request"
+	"backend/internal/model/response"
+	resp "backend/internal/model/response"
 	"backend/internal/service"
-	"backend/pkg/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -83,23 +85,19 @@ func (h *APIDefinitionHandler) GetByID(c *gin.Context) {
 
 // List 获取 API 定义列表
 func (h *APIDefinitionHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	keyword := c.Query("keyword")
-	resource := c.Query("resource")
+	var req request.ListAPIDefinitionRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
-	apiDefs, total, err := h.apiDefService.List(page, pageSize, keyword, resource)
+	apiDefs, total, err := h.apiDefService.List(req.GetPage(), req.GetPageSize(), req.Keyword, req.Resource)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{
-		"list":      apiDefs,
-		"total":     total,
-		"page":      page,
-		"page_size": pageSize,
-	})
+	response.Success(c, resp.NewPageResponse(apiDefs, total, req.GetPage(), req.GetPageSize()))
 }
 
 // GetResources 获取所有资源类型

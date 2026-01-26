@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 	"gorm.io/gorm"
 )
 
@@ -21,7 +21,7 @@ func NewSystemConfigService() *SystemConfigService {
 func (s *SystemConfigService) GetByKey(key string) (*model.SystemConfig, error) {
 	var config model.SystemConfig
 	// key 是 MySQL 保留关键字，需要使用反引号包裹
-	if err := migrations.GetDB().Where("`key` = ?", key).First(&config).Error; err != nil {
+	if err := global.GetDB().Where("`key` = ?", key).First(&config).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil // 返回 nil 表示记录不存在
 		}
@@ -33,7 +33,7 @@ func (s *SystemConfigService) GetByKey(key string) (*model.SystemConfig, error) 
 // Set 设置配置值
 func (s *SystemConfigService) Set(key string, value string) error {
 	var existingConfig model.SystemConfig
-	if err := migrations.GetDB().Where("`key` = ?", key).First(&existingConfig).Error; err != nil {
+	if err := global.GetDB().Where("`key` = ?", key).First(&existingConfig).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// 如果不存在，创建新配置
 			newConfig := model.SystemConfig{
@@ -42,14 +42,14 @@ func (s *SystemConfigService) Set(key string, value string) error {
 				Type:     "json",
 				Category: "system",
 			}
-			return migrations.GetDB().Create(&newConfig).Error
+			return global.GetDB().Create(&newConfig).Error
 		}
 		return err
 	}
 
 	// 更新现有配置
 	existingConfig.Value = value
-	return migrations.GetDB().Save(&existingConfig).Error
+	return global.GetDB().Save(&existingConfig).Error
 }
 
 // GetOIDCConfig 获取 OIDC 配置
@@ -104,7 +104,7 @@ func (s *SystemConfigService) UpdateOIDCConfig(config *OIDCConfigData) error {
 
 	var existingConfig model.SystemConfig
 	// key 是 MySQL 保留关键字，需要使用反引号包裹
-	if err := migrations.GetDB().Where("`key` = ?", "oidc").First(&existingConfig).Error; err != nil {
+	if err := global.GetDB().Where("`key` = ?", "oidc").First(&existingConfig).Error; err != nil {
 		// 如果不存在，创建新配置
 		newConfig := model.SystemConfig{
 			Key:      "oidc",
@@ -112,12 +112,12 @@ func (s *SystemConfigService) UpdateOIDCConfig(config *OIDCConfigData) error {
 			Type:     "json",
 			Category: "auth",
 		}
-		return migrations.GetDB().Create(&newConfig).Error
+		return global.GetDB().Create(&newConfig).Error
 	}
 
 	// 更新现有配置
 	existingConfig.Value = string(valueJSON)
-	return migrations.GetDB().Save(&existingConfig).Error
+	return global.GetDB().Save(&existingConfig).Error
 }
 
 // OIDCConfigData OIDC 配置数据结构
@@ -243,7 +243,7 @@ func (s *SystemConfigService) UpdateEmailConfig(config *EmailConfigData) error {
 
 	var existingConfig model.SystemConfig
 	// key 是 MySQL 保留关键字，需要使用反引号包裹
-	if err := migrations.GetDB().Where("`key` = ?", "email").First(&existingConfig).Error; err != nil {
+	if err := global.GetDB().Where("`key` = ?", "email").First(&existingConfig).Error; err != nil {
 		// 如果不存在，创建新配置
 		newConfig := model.SystemConfig{
 			Key:      "email",
@@ -251,10 +251,10 @@ func (s *SystemConfigService) UpdateEmailConfig(config *EmailConfigData) error {
 			Type:     "json",
 			Category: "email",
 		}
-		return migrations.GetDB().Create(&newConfig).Error
+		return global.GetDB().Create(&newConfig).Error
 	}
 
 	// 更新现有配置
 	existingConfig.Value = string(valueJSON)
-	return migrations.GetDB().Save(&existingConfig).Error
+	return global.GetDB().Save(&existingConfig).Error
 }

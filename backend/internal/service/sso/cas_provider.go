@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"backend/internal/config"
+	"backend/internal/global"
 	"backend/internal/model/sso"
-	"backend/migrations"
 	"backend/pkg/utils"
 
 	"gorm.io/gorm"
@@ -47,7 +47,7 @@ func (s *CASProviderService) ValidateService(serviceURL string) (*sso.OIDCClient
 	// 精确查询：匹配 root_url 的 scheme://host
 	rootURL := fmt.Sprintf("%s://%s", parsedURL.Scheme, parsedURL.Host)
 	var client sso.OIDCClient
-	if err := migrations.GetDB().Where("status = 1 AND root_url = ?", rootURL).First(&client).Error; err != nil {
+	if err := global.GetDB().Where("status = 1 AND root_url = ?", rootURL).First(&client).Error; err != nil {
 		return nil, errors.New("service URL not registered")
 	}
 
@@ -66,7 +66,7 @@ func (s *CASProviderService) CreateTGT(userID uint) (string, error) {
 		ExpiresAt: expiresAt,
 	}
 
-	if err := migrations.GetDB().Create(session).Error; err != nil {
+	if err := global.GetDB().Create(session).Error; err != nil {
 		return "", err
 	}
 
@@ -80,7 +80,7 @@ func (s *CASProviderService) ValidateTGT(tgt string) (*sso.UserSession, error) {
 	}
 
 	var session sso.UserSession
-	if err := migrations.GetDB().Where("session_id = ? AND revoked = false", tgt).First(&session).Error; err != nil {
+	if err := global.GetDB().Where("session_id = ? AND revoked = false", tgt).First(&session).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("TGT not found")
 		}
@@ -109,7 +109,7 @@ func (s *CASProviderService) CreateST(userID uint, clientID, service string) (st
 		Used:        false,
 	}
 
-	if err := migrations.GetDB().Create(authCode).Error; err != nil {
+	if err := global.GetDB().Create(authCode).Error; err != nil {
 		return "", err
 	}
 
@@ -123,7 +123,7 @@ func (s *CASProviderService) ValidateST(ticket, service string) (*sso.User, *sso
 	}
 
 	var authCode sso.AuthorizationCode
-	if err := migrations.GetDB().Where("code = ? AND used = false", ticket).First(&authCode).Error; err != nil {
+	if err := global.GetDB().Where("code = ? AND used = false", ticket).First(&authCode).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, errors.New("ticket not found")
 		}
@@ -144,17 +144,17 @@ func (s *CASProviderService) ValidateST(ticket, service string) (*sso.User, *sso
 	}
 
 	// 标记为已使用
-	migrations.GetDB().Model(&authCode).Update("used", true)
+	global.GetDB().Model(&authCode).Update("used", true)
 
 	// 获取用户信息
 	var user sso.User
-	if err := migrations.GetDB().Preload("Groups").First(&user, authCode.UserID).Error; err != nil {
+	if err := global.GetDB().Preload("Groups").First(&user, authCode.UserID).Error; err != nil {
 		return nil, nil, errors.New("user not found")
 	}
 
 	// 获取客户端信息
 	var client sso.OIDCClient
-	if err := migrations.GetDB().Where("client_id = ?", authCode.ClientID).First(&client).Error; err != nil {
+	if err := global.GetDB().Where("client_id = ?", authCode.ClientID).First(&client).Error; err != nil {
 		return nil, nil, errors.New("client not found")
 	}
 
@@ -175,7 +175,7 @@ func (s *CASProviderService) CreatePGT(userID uint, clientID string) (string, st
 		ExpiresAt: expiresAt,
 	}
 
-	if err := migrations.GetDB().Create(accessToken).Error; err != nil {
+	if err := global.GetDB().Create(accessToken).Error; err != nil {
 		return "", "", err
 	}
 
@@ -189,7 +189,7 @@ func (s *CASProviderService) ValidatePGT(pgt string) (*sso.AccessToken, error) {
 	}
 
 	var token sso.AccessToken
-	if err := migrations.GetDB().Where("token = ? AND revoked = false", pgt).First(&token).Error; err != nil {
+	if err := global.GetDB().Where("token = ? AND revoked = false", pgt).First(&token).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("PGT not found")
 		}
@@ -219,7 +219,7 @@ func (s *CASProviderService) CreatePT(userID uint, clientID, targetService, pgt 
 		Used:        false,
 	}
 
-	if err := migrations.GetDB().Create(authCode).Error; err != nil {
+	if err := global.GetDB().Create(authCode).Error; err != nil {
 		return "", err
 	}
 
@@ -233,7 +233,7 @@ func (s *CASProviderService) ValidatePT(ticket, service string) (*sso.User, []st
 	}
 
 	var authCode sso.AuthorizationCode
-	if err := migrations.GetDB().Where("code = ? AND used = false", ticket).First(&authCode).Error; err != nil {
+	if err := global.GetDB().Where("code = ? AND used = false", ticket).First(&authCode).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil, errors.New("ticket not found")
 		}
@@ -253,11 +253,11 @@ func (s *CASProviderService) ValidatePT(ticket, service string) (*sso.User, []st
 	}
 
 	// 标记为已使用
-	migrations.GetDB().Model(&authCode).Update("used", true)
+	global.GetDB().Model(&authCode).Update("used", true)
 
 	// 获取用户信息
 	var user sso.User
-	if err := migrations.GetDB().Preload("Groups").First(&user, authCode.UserID).Error; err != nil {
+	if err := global.GetDB().Preload("Groups").First(&user, authCode.UserID).Error; err != nil {
 		return nil, nil, errors.New("user not found")
 	}
 
@@ -283,11 +283,11 @@ func (s *CASProviderService) Logout(tgt string) ([]string, error) {
 	}
 
 	// 撤销 TGT
-	migrations.GetDB().Model(&sso.UserSession{}).Where("session_id = ?", tgt).Update("revoked", true)
+	global.GetDB().Model(&sso.UserSession{}).Where("session_id = ?", tgt).Update("revoked", true)
 
 	// 查找该用户的所有 ST（用于单点登出通知）
 	var authCodes []sso.AuthorizationCode
-	migrations.GetDB().Where("user_id = ? AND scopes = ? AND used = true", session.UserID, "cas:st").Find(&authCodes)
+	global.GetDB().Where("user_id = ? AND scopes = ? AND used = true", session.UserID, "cas:st").Find(&authCodes)
 
 	var services []string
 	for _, code := range authCodes {
@@ -349,7 +349,7 @@ func (s *CASProviderService) BuildUserAttributes(user *sso.User) map[string]inte
 // AuthenticateUser 验证用户（复用 OIDC 的方法）
 func (s *CASProviderService) AuthenticateUser(tenantID uint, username, password string) (*sso.User, error) {
 	var user sso.User
-	db := migrations.GetDB().Where("username = ? AND status = 1", username)
+	db := global.GetDB().Where("username = ? AND status = 1", username)
 	if tenantID > 0 {
 		db = db.Where("tenant_id = ?", tenantID)
 	}
@@ -366,7 +366,7 @@ func (s *CASProviderService) AuthenticateUser(tenantID uint, username, password 
 
 	// 更新最后登录时间
 	now := time.Now()
-	migrations.GetDB().Model(&user).Update("last_login_at", now)
+	global.GetDB().Model(&user).Update("last_login_at", now)
 
 	return &user, nil
 }
@@ -379,7 +379,7 @@ func (s *CASProviderService) GetUserFromSession(sessionToken string) (*sso.User,
 	}
 
 	var user sso.User
-	if err := migrations.GetDB().Preload("Groups").First(&user, userID).Error; err != nil {
+	if err := global.GetDB().Preload("Groups").First(&user, userID).Error; err != nil {
 		return nil, errors.New("user not found")
 	}
 

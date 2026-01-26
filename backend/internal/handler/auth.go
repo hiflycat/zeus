@@ -1,10 +1,12 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
 	"backend/internal/config"
+	"backend/internal/model/request"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // AuthHandler 认证处理器
@@ -19,15 +21,9 @@ func NewAuthHandler() *AuthHandler {
 	}
 }
 
-// LoginRequest 登录请求
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
 // Login 登录
 func (h *AuthHandler) Login(c *gin.Context) {
-	var req LoginRequest
+	var req request.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -103,16 +99,9 @@ func (h *AuthHandler) GetServerInfo(c *gin.Context) {
 	response.Success(c, info)
 }
 
-// ChangePasswordRequest 修改密码请求
-type ChangePasswordRequest struct {
-	OldPassword     string `json:"old_password" binding:"required"`
-	NewPassword     string `json:"new_password" binding:"required,min=6"`
-	ConfirmPassword string `json:"confirm_password" binding:"required"`
-}
-
 // ChangePassword 修改密码
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
-	var req ChangePasswordRequest
+	var req request.ChangePasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return

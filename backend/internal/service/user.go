@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 	"backend/pkg/utils"
 )
 
@@ -20,7 +20,7 @@ func NewUserService() *UserService {
 func (s *UserService) Create(user *model.User) error {
 	// 检查用户名是否已存在
 	var count int64
-	if err := migrations.GetDB().Model(&model.User{}).Where("username = ?", user.Username).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.User{}).Where("username = ?", user.Username).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
@@ -29,7 +29,7 @@ func (s *UserService) Create(user *model.User) error {
 
 	// 检查邮箱是否已存在
 	if user.Email != "" {
-		if err := migrations.GetDB().Model(&model.User{}).Where("email = ?", user.Email).Count(&count).Error; err != nil {
+		if err := global.GetDB().Model(&model.User{}).Where("email = ?", user.Email).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
@@ -45,20 +45,20 @@ func (s *UserService) Create(user *model.User) error {
 	user.Password = hashedPassword
 
 	// 创建用户
-	return migrations.GetDB().Create(user).Error
+	return global.GetDB().Create(user).Error
 }
 
 // Update 更新用户
 func (s *UserService) Update(userID uint, user *model.User) error {
 	var existingUser model.User
-	if err := migrations.GetDB().Where("id = ?", userID).First(&existingUser).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", userID).First(&existingUser).Error; err != nil {
 		return err
 	}
 
 	// 检查用户名是否已被其他用户使用
 	if user.Username != existingUser.Username {
 		var count int64
-		if err := migrations.GetDB().Model(&model.User{}).Where("username = ? AND id != ?", user.Username, userID).Count(&count).Error; err != nil {
+		if err := global.GetDB().Model(&model.User{}).Where("username = ? AND id != ?", user.Username, userID).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
@@ -69,7 +69,7 @@ func (s *UserService) Update(userID uint, user *model.User) error {
 	// 检查邮箱是否已被其他用户使用
 	if user.Email != "" && user.Email != existingUser.Email {
 		var count int64
-		if err := migrations.GetDB().Model(&model.User{}).Where("email = ? AND id != ?", user.Email, userID).Count(&count).Error; err != nil {
+		if err := global.GetDB().Model(&model.User{}).Where("email = ? AND id != ?", user.Email, userID).Count(&count).Error; err != nil {
 			return err
 		}
 		if count > 0 {
@@ -90,31 +90,31 @@ func (s *UserService) Update(userID uint, user *model.User) error {
 
 	// 使用 Select 明确指定要更新的字段，包括零值字段
 	if user.Password != "" {
-		return migrations.GetDB().Model(&existingUser).Select("username", "email", "phone", "status", "password").Updates(user).Error
+		return global.GetDB().Model(&existingUser).Select("username", "email", "phone", "status", "password").Updates(user).Error
 	}
-	return migrations.GetDB().Model(&existingUser).Select("username", "email", "phone", "status").Updates(user).Error
+	return global.GetDB().Model(&existingUser).Select("username", "email", "phone", "status").Updates(user).Error
 }
 
 // Delete 删除用户
 func (s *UserService) Delete(userID uint) error {
 	var user model.User
-	if err := migrations.GetDB().Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", userID).First(&user).Error; err != nil {
 		return err
 	}
 
 	// 清理 user_roles 中间表关联
-	if err := migrations.GetDB().Model(&user).Association("Roles").Clear(); err != nil {
+	if err := global.GetDB().Model(&user).Association("Roles").Clear(); err != nil {
 		return err
 	}
 
 	// 删除用户
-	return migrations.GetDB().Delete(&user).Error
+	return global.GetDB().Delete(&user).Error
 }
 
 // GetByID 根据 ID 获取用户
 func (s *UserService) GetByID(userID uint) (*model.User, error) {
 	var user model.User
-	if err := migrations.GetDB().Preload("Roles").Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := global.GetDB().Preload("Roles").Where("id = ?", userID).First(&user).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -125,7 +125,7 @@ func (s *UserService) List(page, pageSize int, keyword string) ([]model.User, in
 	var users []model.User
 	var total int64
 
-	query := migrations.GetDB().Model(&model.User{})
+	query := global.GetDB().Model(&model.User{})
 
 	// 搜索
 	if keyword != "" {
@@ -149,14 +149,14 @@ func (s *UserService) List(page, pageSize int, keyword string) ([]model.User, in
 // AssignRoles 分配角色
 func (s *UserService) AssignRoles(userID uint, roleIDs []uint) error {
 	var user model.User
-	if err := migrations.GetDB().Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", userID).First(&user).Error; err != nil {
 		return err
 	}
 
 	var roles []model.Role
-	if err := migrations.GetDB().Where("id IN ?", roleIDs).Find(&roles).Error; err != nil {
+	if err := global.GetDB().Where("id IN ?", roleIDs).Find(&roles).Error; err != nil {
 		return err
 	}
 
-	return migrations.GetDB().Model(&user).Association("Roles").Replace(roles)
+	return global.GetDB().Model(&user).Association("Roles").Replace(roles)
 }

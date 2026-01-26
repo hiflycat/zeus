@@ -4,8 +4,9 @@ import (
 	"errors"
 	"sort"
 
+	"backend/internal/global"
 	"backend/internal/model"
-	"backend/migrations"
+
 	"gorm.io/gorm"
 )
 
@@ -22,7 +23,7 @@ func (s *MenuService) Create(menu *model.Menu) error {
 	// 如果指定了父菜单，检查父菜单是否存在
 	if menu.ParentID != nil && *menu.ParentID > 0 {
 		var parentMenu model.Menu
-		if err := migrations.GetDB().Where("id = ?", *menu.ParentID).First(&parentMenu).Error; err != nil {
+		if err := global.GetDB().Where("id = ?", *menu.ParentID).First(&parentMenu).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("父菜单不存在")
 			}
@@ -30,13 +31,13 @@ func (s *MenuService) Create(menu *model.Menu) error {
 		}
 	}
 
-	return migrations.GetDB().Create(menu).Error
+	return global.GetDB().Create(menu).Error
 }
 
 // Update 更新菜单
 func (s *MenuService) Update(menuID uint, menu *model.Menu) error {
 	var existingMenu model.Menu
-	if err := migrations.GetDB().Where("id = ?", menuID).First(&existingMenu).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", menuID).First(&existingMenu).Error; err != nil {
 		return err
 	}
 
@@ -46,7 +47,7 @@ func (s *MenuService) Update(menuID uint, menu *model.Menu) error {
 			return errors.New("不能将自己设为父菜单")
 		}
 		var parentMenu model.Menu
-		if err := migrations.GetDB().Where("id = ?", *menu.ParentID).First(&parentMenu).Error; err != nil {
+		if err := global.GetDB().Where("id = ?", *menu.ParentID).First(&parentMenu).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New("父菜单不存在")
 			}
@@ -55,19 +56,19 @@ func (s *MenuService) Update(menuID uint, menu *model.Menu) error {
 	}
 
 	// 使用 Select 明确指定要更新的字段，包括零值字段
-	return migrations.GetDB().Model(&existingMenu).Select("name", "path", "icon", "component", "parent_id", "sort", "status").Updates(menu).Error
+	return global.GetDB().Model(&existingMenu).Select("name", "path", "icon", "component", "parent_id", "sort", "status").Updates(menu).Error
 }
 
 // Delete 删除菜单
 func (s *MenuService) Delete(menuID uint) error {
 	var menu model.Menu
-	if err := migrations.GetDB().Where("id = ?", menuID).First(&menu).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", menuID).First(&menu).Error; err != nil {
 		return err
 	}
 
 	// 检查是否有子菜单
 	var count int64
-	if err := migrations.GetDB().Model(&model.Menu{}).Where("parent_id = ?", menuID).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.Menu{}).Where("parent_id = ?", menuID).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
@@ -75,7 +76,7 @@ func (s *MenuService) Delete(menuID uint) error {
 	}
 
 	// 检查是否有角色使用此菜单
-	if err := migrations.GetDB().Model(&model.Role{}).Joins("JOIN role_menus ON roles.id = role_menus.role_id").Where("role_menus.menu_id = ?", menuID).Count(&count).Error; err != nil {
+	if err := global.GetDB().Model(&model.Role{}).Joins("JOIN role_menus ON roles.id = role_menus.role_id").Where("role_menus.menu_id = ?", menuID).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
@@ -83,17 +84,17 @@ func (s *MenuService) Delete(menuID uint) error {
 	}
 
 	// 清理 role_menus 中间表关联（虽然上面已检查无关联，但保险起见）
-	if err := migrations.GetDB().Model(&menu).Association("Roles").Clear(); err != nil {
+	if err := global.GetDB().Model(&menu).Association("Roles").Clear(); err != nil {
 		return err
 	}
 
-	return migrations.GetDB().Delete(&menu).Error
+	return global.GetDB().Delete(&menu).Error
 }
 
 // GetByID 根据 ID 获取菜单
 func (s *MenuService) GetByID(menuID uint) (*model.Menu, error) {
 	var menu model.Menu
-	if err := migrations.GetDB().Where("id = ?", menuID).First(&menu).Error; err != nil {
+	if err := global.GetDB().Where("id = ?", menuID).First(&menu).Error; err != nil {
 		return nil, err
 	}
 	return &menu, nil
@@ -103,7 +104,7 @@ func (s *MenuService) GetByID(menuID uint) (*model.Menu, error) {
 func (s *MenuService) GetAll(keyword string) ([]model.Menu, error) {
 	var menus []model.Menu
 
-	query := migrations.GetDB().Model(&model.Menu{})
+	query := global.GetDB().Model(&model.Menu{})
 
 	// 搜索
 	if keyword != "" {
@@ -167,7 +168,7 @@ func (s *MenuService) List(page, pageSize int, keyword string) ([]model.Menu, in
 	var menus []model.Menu
 	var total int64
 
-	query := migrations.GetDB().Model(&model.Menu{})
+	query := global.GetDB().Model(&model.Menu{})
 
 	// 搜索
 	if keyword != "" {
@@ -192,13 +193,13 @@ func (s *MenuService) List(page, pageSize int, keyword string) ([]model.Menu, in
 // roleID 为 0 时返回所有角色的菜单，否则只返回指定角色的菜单
 func (s *MenuService) GetUserMenus(userID uint, roleID uint) ([]model.Menu, error) {
 	var user model.User
-	if err := migrations.GetDB().Preload("Roles.Menus", "status = ?", 1).Where("id = ?", userID).First(&user).Error; err != nil {
+	if err := global.GetDB().Preload("Roles.Menus", "status = ?", 1).Where("id = ?", userID).First(&user).Error; err != nil {
 		return nil, err
 	}
 
 	// 收集所有菜单并去重
 	menuMap := make(map[uint]*model.Menu)
-	
+
 	// 如果指定了角色ID，只获取该角色的菜单
 	if roleID > 0 {
 		for _, role := range user.Roles {

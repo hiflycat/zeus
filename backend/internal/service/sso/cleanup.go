@@ -3,8 +3,8 @@ package sso
 import (
 	"time"
 
+	"backend/internal/global"
 	"backend/internal/model/sso"
-	"backend/migrations"
 	"backend/pkg/logger"
 
 	"go.uber.org/zap"
@@ -20,7 +20,7 @@ func (j *TokenCleanupJob) Name() string {
 
 // Run 执行清理
 func (j *TokenCleanupJob) Run() {
-	db := migrations.GetDB()
+	db := global.GetDB()
 	now := time.Now()
 
 	// 清理过期的授权码

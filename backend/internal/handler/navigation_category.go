@@ -3,10 +3,12 @@ package handler
 import (
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"backend/internal/model"
+	"backend/internal/model/request"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // NavigationCategoryHandler 网站分类处理器
@@ -89,30 +91,28 @@ func (h *NavigationCategoryHandler) GetByID(c *gin.Context) {
 func (h *NavigationCategoryHandler) List(c *gin.Context) {
 	pageStr := c.Query("page")
 	pageSizeStr := c.Query("page_size")
-	keyword := c.Query("keyword")
 
 	// 判断是否有分页参数
 	hasPagination := pageStr != "" || pageSizeStr != ""
 
 	if hasPagination {
 		// 有分页参数，返回分页数据
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+		var req request.ListNavigationCategoryRequest
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
 
-		categories, total, err := h.categoryService.List(page, pageSize, keyword)
+		categories, total, err := h.categoryService.List(req.GetPage(), req.GetPageSize(), req.Keyword)
 		if err != nil {
 			response.InternalError(c, err.Error())
 			return
 		}
 
-		response.Success(c, gin.H{
-			"list":      categories,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		})
+		response.Success(c, response.NewPageResponse(categories, total, req.GetPage(), req.GetPageSize()))
 	} else {
 		// 无分页参数，返回树形结构
+		keyword := c.Query("keyword")
 		allCategories, err := h.categoryService.GetAll(keyword)
 		if err != nil {
 			response.InternalError(c, err.Error())

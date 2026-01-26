@@ -5,7 +5,7 @@ import (
 
 	casbinPkg "backend/internal/casbin"
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 )
 
 // Policy 策略结构
@@ -60,7 +60,7 @@ func (s *PolicyService) UpdateRolePolicies(roleID uint, apiDefIDs []uint) error 
 	// 获取选中的 API 定义
 	var apiDefs []model.APIDefinition
 	if len(apiDefIDs) > 0 {
-		if err := migrations.GetDB().Where("id IN ?", apiDefIDs).Find(&apiDefs).Error; err != nil {
+		if err := global.GetDB().Where("id IN ?", apiDefIDs).Find(&apiDefs).Error; err != nil {
 			return err
 		}
 	}
@@ -90,7 +90,7 @@ func (s *PolicyService) GetRoleAPIDefIDs(roleID uint) ([]uint, error) {
 	for _, rule := range rules {
 		if len(rule) >= 3 {
 			var apiDef model.APIDefinition
-			if err := migrations.GetDB().Where("path = ? AND method = ?", rule[1], rule[2]).First(&apiDef).Error; err == nil {
+			if err := global.GetDB().Where("path = ? AND method = ?", rule[1], rule[2]).First(&apiDef).Error; err == nil {
 				ids = append(ids, apiDef.ID)
 			}
 		}

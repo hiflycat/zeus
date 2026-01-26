@@ -3,9 +3,11 @@ package sso
 import (
 	"strconv"
 
+	"backend/internal/model/request"
+	resp "backend/internal/model/response"
 	"backend/internal/model/sso"
 	ssoService "backend/internal/service/sso"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -22,17 +24,19 @@ func NewTenantHandler() *TenantHandler {
 
 // List 获取租户列表
 func (h *TenantHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	name := c.Query("name")
+	var req request.ListTenantRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
-	tenants, total, err := h.service.List(page, pageSize, name)
+	tenants, total, err := h.service.List(req.GetPage(), req.GetPageSize(), req.Name)
 	if err != nil {
 		response.Error(c, 500, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{"list": tenants, "total": total})
+	response.Success(c, resp.NewPageResponse(tenants, total, req.GetPage(), req.GetPageSize()))
 }
 
 // GetByID 获取租户详情
@@ -100,18 +104,19 @@ func NewUserHandler() *UserHandler {
 
 // List 获取用户列表
 func (h *UserHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	tenantID, _ := strconv.ParseUint(c.Query("tenant_id"), 10, 32)
-	username := c.Query("username")
+	var req request.ListSSOUserRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
-	users, total, err := h.service.List(uint(tenantID), page, pageSize, username)
+	users, total, err := h.service.List(req.TenantID, req.GetPage(), req.GetPageSize(), req.Username)
 	if err != nil {
 		response.Error(c, 500, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{"list": users, "total": total})
+	response.Success(c, resp.NewPageResponse(users, total, req.GetPage(), req.GetPageSize()))
 }
 
 // GetByID 获取用户详情
@@ -125,21 +130,9 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 	response.Success(c, user)
 }
 
-// CreateUserRequest 创建用户请求
-type CreateUserRequest struct {
-	TenantID    uint   `json:"tenant_id" binding:"required"`
-	Username    string `json:"username" binding:"required"`
-	Password    string `json:"password" binding:"required,min=6"`
-	Email       string `json:"email"`
-	DisplayName string `json:"display_name"`
-	Phone       string `json:"phone"`
-	Status      int    `json:"status"`
-	GroupIDs    []uint `json:"group_ids"`
-}
-
 // Create 创建用户
 func (h *UserHandler) Create(c *gin.Context) {
-	var req CreateUserRequest
+	var req request.CreateSSOUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -171,20 +164,10 @@ func (h *UserHandler) Create(c *gin.Context) {
 	response.Success(c, user)
 }
 
-// UpdateUserRequest 更新用户请求
-type UpdateUserRequest struct {
-	Username    string `json:"username"`
-	Email       string `json:"email"`
-	DisplayName string `json:"display_name"`
-	Phone       string `json:"phone"`
-	Status      int    `json:"status"`
-	GroupIDs    []uint `json:"group_ids"`
-}
-
 // Update 更新用户
 func (h *UserHandler) Update(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req UpdateUserRequest
+	var req request.UpdateSSOUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -213,15 +196,10 @@ func (h *UserHandler) Update(c *gin.Context) {
 	response.Success(c, user)
 }
 
-// ResetPasswordRequest 重置密码请求
-type ResetPasswordRequest struct {
-	Password string `json:"password" binding:"required,min=6"`
-}
-
 // ResetPassword 重置密码
 func (h *UserHandler) ResetPassword(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req ResetPasswordRequest
+	var req request.ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -244,15 +222,10 @@ func (h *UserHandler) Delete(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// AssignGroupsRequest 分配用户组请求
-type AssignGroupsRequest struct {
-	GroupIDs []uint `json:"group_ids"`
-}
-
 // AssignGroups 分配用户组
 func (h *UserHandler) AssignGroups(c *gin.Context) {
 	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
-	var req AssignGroupsRequest
+	var req request.AssignGroupsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -277,24 +250,30 @@ func NewGroupHandler() *GroupHandler {
 
 // List 获取用户组列表
 func (h *GroupHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	tenantID, _ := strconv.ParseUint(c.Query("tenant_id"), 10, 32)
+	var req request.ListGroupRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
-	groups, total, err := h.service.List(uint(tenantID), page, pageSize)
+	groups, total, err := h.service.List(req.TenantID, req.GetPage(), req.GetPageSize())
 	if err != nil {
 		response.Error(c, 500, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{"list": groups, "total": total})
+	response.Success(c, resp.NewPageResponse(groups, total, req.GetPage(), req.GetPageSize()))
 }
 
 // ListActive 获取启用的用户组（用于下拉选择）
 func (h *GroupHandler) ListActive(c *gin.Context) {
-	tenantID, _ := strconv.ParseUint(c.Query("tenant_id"), 10, 32)
+	var req request.ListGroupRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
-	groups, err := h.service.ListActive(uint(tenantID))
+	groups, err := h.service.ListActive(req.TenantID)
 	if err != nil {
 		response.Error(c, 500, err.Error())
 		return
@@ -368,17 +347,19 @@ func NewOIDCClientHandler() *OIDCClientHandler {
 
 // List 获取客户端列表
 func (h *OIDCClientHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	tenantID, _ := strconv.ParseUint(c.Query("tenant_id"), 10, 32)
+	var req request.ListOIDCClientRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
 
-	clients, total, err := h.service.List(uint(tenantID), page, pageSize)
+	clients, total, err := h.service.List(req.TenantID, req.GetPage(), req.GetPageSize())
 	if err != nil {
 		response.Error(c, 500, err.Error())
 		return
 	}
 
-	response.Success(c, gin.H{"list": clients, "total": total})
+	response.Success(c, resp.NewPageResponse(clients, total, req.GetPage(), req.GetPageSize()))
 }
 
 // GetByID 获取客户端详情

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 	"backend/pkg/email"
 	"backend/pkg/notify"
 )
@@ -25,7 +25,7 @@ func NewNotificationService() *NotificationService {
 // NotifyTicketCreated 工单创建通知
 func (s *NotificationService) NotifyTicketCreated(ticket *model.Ticket) {
 	var creator model.User
-	migrations.GetDB().First(&creator, ticket.CreatorID)
+	global.GetDB().First(&creator, ticket.CreatorID)
 
 	title := fmt.Sprintf("新工单: %s", ticket.Title)
 	content := fmt.Sprintf("工单编号: #%d\n创建人: %s\n优先级: %s\n\n%s",
@@ -37,7 +37,7 @@ func (s *NotificationService) NotifyTicketCreated(ticket *model.Ticket) {
 // NotifyTicketApproved 工单审批通知
 func (s *NotificationService) NotifyTicketApproved(ticket *model.Ticket, approved bool, comment string) {
 	var creator model.User
-	migrations.GetDB().First(&creator, ticket.CreatorID)
+	global.GetDB().First(&creator, ticket.CreatorID)
 
 	status := "已通过"
 	if !approved {
@@ -54,7 +54,7 @@ func (s *NotificationService) NotifyTicketApproved(ticket *model.Ticket, approve
 // NotifyTicketCompleted 工单完成通知
 func (s *NotificationService) NotifyTicketCompleted(ticket *model.Ticket) {
 	var creator model.User
-	migrations.GetDB().First(&creator, ticket.CreatorID)
+	global.GetDB().First(&creator, ticket.CreatorID)
 
 	title := fmt.Sprintf("工单已完成: %s", ticket.Title)
 	content := fmt.Sprintf("工单编号: #%d\n状态: 已完成", ticket.ID)
@@ -75,7 +75,7 @@ func (s *NotificationService) NotifyPendingApproval(ticket *model.Ticket, approv
 // NotifyTicketCC 抄送通知
 func (s *NotificationService) NotifyTicketCC(ticket *model.Ticket, ccUserIDs []uint) {
 	var creator model.User
-	migrations.GetDB().First(&creator, ticket.CreatorID)
+	global.GetDB().First(&creator, ticket.CreatorID)
 
 	title := fmt.Sprintf("工单抄送: %s", ticket.Title)
 	content := fmt.Sprintf("工单编号: #%d\n创建人: %s\n您已被抄送此工单，请知悉。",
@@ -89,7 +89,7 @@ func (s *NotificationService) NotifyTicketCC(ticket *model.Ticket, ccUserIDs []u
 // NotifyTicketUrge 催办通知
 func (s *NotificationService) NotifyTicketUrge(ticket *model.Ticket, approverIDs []uint) {
 	var creator model.User
-	migrations.GetDB().First(&creator, ticket.CreatorID)
+	global.GetDB().First(&creator, ticket.CreatorID)
 
 	title := fmt.Sprintf("工单催办: %s", ticket.Title)
 	content := fmt.Sprintf("工单编号: #%d\n创建人: %s\n请尽快处理此工单！",
@@ -110,7 +110,7 @@ func (s *NotificationService) sendNotification(title, content string) {
 // sendToUser 发送通知给指定用户
 func (s *NotificationService) sendToUser(userID uint, title, content string) {
 	var user model.User
-	if err := migrations.GetDB().First(&user, userID).Error; err != nil {
+	if err := global.GetDB().First(&user, userID).Error; err != nil {
 		return
 	}
 

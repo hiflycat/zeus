@@ -3,10 +3,12 @@ package handler
 import (
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"backend/internal/model"
+	"backend/internal/model/request"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // MenuHandler 菜单处理器
@@ -96,21 +98,19 @@ func (h *MenuHandler) List(c *gin.Context) {
 
 	if hasPagination {
 		// 有分页参数，返回分页数据
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+		var req request.ListMenuRequest
+		if err := c.ShouldBindQuery(&req); err != nil {
+			response.BadRequest(c, err.Error())
+			return
+		}
 
-		menus, total, err := h.menuService.List(page, pageSize, keyword)
+		menus, total, err := h.menuService.List(req.GetPage(), req.GetPageSize(), req.Keyword)
 		if err != nil {
 			response.InternalError(c, err.Error())
 			return
 		}
 
-		response.Success(c, gin.H{
-			"list":      menus,
-			"total":     total,
-			"page":      page,
-			"page_size": pageSize,
-		})
+		response.Success(c, response.NewPageResponse(menus, total, req.GetPage(), req.GetPageSize()))
 	} else {
 		// 无分页参数，返回树形结构
 		allMenus, err := h.menuService.GetAll(keyword)

@@ -6,8 +6,9 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"backend/internal/model"
+	"backend/internal/model/request"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 )
 
 type CommentHandler struct {
@@ -23,10 +24,7 @@ func (h *CommentHandler) Create(c *gin.Context) {
 	ticketID, _ := strconv.ParseUint(c.Param("ticket_id"), 10, 32)
 	userID, _ := c.Get("user_id")
 
-	var req struct {
-		Content     string `json:"content" binding:"required"`
-		CommentType string `json:"comment_type"`
-	}
+	var req request.CreateCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "请输入评论内容")
 		return

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"backend/internal/global"
 	"backend/internal/model/sso"
-	"backend/migrations"
 	"backend/pkg/crypto"
 	"backend/pkg/utils"
 
@@ -80,7 +80,7 @@ func (s *OIDCProviderService) GetJWKS() *crypto.JWKS {
 // ValidateClient 验证客户端（只验证域名）
 func (s *OIDCProviderService) ValidateClient(clientID, redirectURI string) (*sso.OIDCClient, error) {
 	var client sso.OIDCClient
-	if err := migrations.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
+	if err := global.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("invalid client_id")
 		}
@@ -110,7 +110,7 @@ func (s *OIDCProviderService) ValidateClient(clientID, redirectURI string) (*sso
 // ValidateClientCredentials 验证客户端凭据
 func (s *OIDCProviderService) ValidateClientCredentials(clientID, clientSecret string) (*sso.OIDCClient, error) {
 	var client sso.OIDCClient
-	if err := migrations.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
+	if err := global.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("invalid client credentials")
 		}
@@ -143,7 +143,7 @@ func (s *OIDCProviderService) CreateAuthorizationCode(clientID string, userID ui
 		Used:                false,
 	}
 
-	if err := migrations.GetDB().Create(authCode).Error; err != nil {
+	if err := global.GetDB().Create(authCode).Error; err != nil {
 		return "", err
 	}
 
@@ -160,7 +160,7 @@ func (s *OIDCProviderService) ExchangeAuthorizationCode(code, clientID, clientSe
 
 	// 查找授权码
 	var authCode sso.AuthorizationCode
-	if err := migrations.GetDB().Where("code = ? AND used = false", code).First(&authCode).Error; err != nil {
+	if err := global.GetDB().Where("code = ? AND used = false", code).First(&authCode).Error; err != nil {
 		return nil, errors.New("invalid authorization code")
 	}
 
@@ -190,11 +190,11 @@ func (s *OIDCProviderService) ExchangeAuthorizationCode(code, clientID, clientSe
 	}
 
 	// 标记授权码已使用
-	migrations.GetDB().Model(&authCode).Update("used", true)
+	global.GetDB().Model(&authCode).Update("used", true)
 
 	// 获取用户信息
 	var user sso.User
-	if err := migrations.GetDB().Preload("Groups").First(&user, authCode.UserID).Error; err != nil {
+	if err := global.GetDB().Preload("Groups").First(&user, authCode.UserID).Error; err != nil {
 		return nil, errors.New("user not found")
 	}
 
@@ -226,7 +226,7 @@ func (s *OIDCProviderService) ClientCredentialsGrant(clientID, clientSecret, sco
 		ExpiresAt: expiresAt,
 	}
 
-	if err := migrations.GetDB().Create(token).Error; err != nil {
+	if err := global.GetDB().Create(token).Error; err != nil {
 		return nil, err
 	}
 
@@ -247,7 +247,7 @@ func (s *OIDCProviderService) RefreshTokenGrant(refreshToken, clientID, clientSe
 
 	// 查找刷新令牌
 	var rt sso.RefreshToken
-	if err := migrations.GetDB().Preload("AccessToken").Where("token = ? AND revoked = false", refreshToken).First(&rt).Error; err != nil {
+	if err := global.GetDB().Preload("AccessToken").Where("token = ? AND revoked = false", refreshToken).First(&rt).Error; err != nil {
 		return nil, errors.New("invalid refresh token")
 	}
 
@@ -260,12 +260,12 @@ func (s *OIDCProviderService) RefreshTokenGrant(refreshToken, clientID, clientSe
 	}
 
 	// 撤销旧令牌
-	migrations.GetDB().Model(&rt).Update("revoked", true)
-	migrations.GetDB().Model(&rt.AccessToken).Update("revoked", true)
+	global.GetDB().Model(&rt).Update("revoked", true)
+	global.GetDB().Model(&rt.AccessToken).Update("revoked", true)
 
 	// 获取用户信息
 	var user sso.User
-	if err := migrations.GetDB().Preload("Groups").First(&user, rt.AccessToken.UserID).Error; err != nil {
+	if err := global.GetDB().Preload("Groups").First(&user, rt.AccessToken.UserID).Error; err != nil {
 		return nil, errors.New("user not found")
 	}
 
@@ -298,7 +298,7 @@ func (s *OIDCProviderService) generateTokens(client *sso.OIDCClient, user *sso.U
 		Scopes:    scopes,
 		ExpiresAt: accessExpiresAt,
 	}
-	if err := migrations.GetDB().Create(at).Error; err != nil {
+	if err := global.GetDB().Create(at).Error; err != nil {
 		return nil, err
 	}
 
@@ -308,7 +308,7 @@ func (s *OIDCProviderService) generateTokens(client *sso.OIDCClient, user *sso.U
 		AccessTokenID: at.ID,
 		ExpiresAt:     refreshExpiresAt,
 	}
-	if err := migrations.GetDB().Create(rt).Error; err != nil {
+	if err := global.GetDB().Create(rt).Error; err != nil {
 		return nil, err
 	}
 
@@ -381,7 +381,7 @@ func (s *OIDCProviderService) generateIDToken(client *sso.OIDCClient, user *sso.
 // GetUserInfo 获取用户信息
 func (s *OIDCProviderService) GetUserInfo(accessToken string) (map[string]interface{}, error) {
 	var at sso.AccessToken
-	if err := migrations.GetDB().Where("token = ? AND revoked = false", accessToken).First(&at).Error; err != nil {
+	if err := global.GetDB().Where("token = ? AND revoked = false", accessToken).First(&at).Error; err != nil {
 		return nil, errors.New("invalid access token")
 	}
 
@@ -390,7 +390,7 @@ func (s *OIDCProviderService) GetUserInfo(accessToken string) (map[string]interf
 	}
 
 	var user sso.User
-	if err := migrations.GetDB().Preload("Groups").First(&user, at.UserID).Error; err != nil {
+	if err := global.GetDB().Preload("Groups").First(&user, at.UserID).Error; err != nil {
 		return nil, errors.New("user not found")
 	}
 
@@ -425,15 +425,15 @@ func (s *OIDCProviderService) GetUserInfo(accessToken string) (map[string]interf
 // RevokeToken 撤销令牌
 func (s *OIDCProviderService) RevokeToken(token, tokenTypeHint string) error {
 	if tokenTypeHint == "refresh_token" {
-		return migrations.GetDB().Model(&sso.RefreshToken{}).Where("token = ?", token).Update("revoked", true).Error
+		return global.GetDB().Model(&sso.RefreshToken{}).Where("token = ?", token).Update("revoked", true).Error
 	}
-	return migrations.GetDB().Model(&sso.AccessToken{}).Where("token = ?", token).Update("revoked", true).Error
+	return global.GetDB().Model(&sso.AccessToken{}).Where("token = ?", token).Update("revoked", true).Error
 }
 
 // IntrospectToken 令牌内省
 func (s *OIDCProviderService) IntrospectToken(token string) (map[string]interface{}, error) {
 	var at sso.AccessToken
-	if err := migrations.GetDB().Where("token = ?", token).First(&at).Error; err != nil {
+	if err := global.GetDB().Where("token = ?", token).First(&at).Error; err != nil {
 		return map[string]interface{}{"active": false}, nil
 	}
 
@@ -528,7 +528,7 @@ func (s *OIDCProviderService) ParseIDTokenHintWithUser(idTokenHint string) (clie
 // ValidatePostLogoutRedirectURI 验证 post_logout_redirect_uri（使用 RootURL 验证域名）
 func (s *OIDCProviderService) ValidatePostLogoutRedirectURI(clientID, postLogoutRedirectURI string) error {
 	var client sso.OIDCClient
-	if err := migrations.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
+	if err := global.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
 		return errors.New("invalid client_id")
 	}
 
@@ -554,7 +554,7 @@ func (s *OIDCProviderService) ValidatePostLogoutRedirectURI(clientID, postLogout
 
 // RevokeUserTokens 撤销用户的所有令牌
 func (s *OIDCProviderService) RevokeUserTokens(userID uint, clientID string) error {
-	db := migrations.GetDB()
+	db := global.GetDB()
 
 	// 撤销访问令牌
 	query := db.Model(&sso.AccessToken{}).Where("user_id = ?", userID)
@@ -576,7 +576,7 @@ func (s *OIDCProviderService) RevokeUserTokens(userID uint, clientID string) err
 // AuthenticateUser 验证用户
 func (s *OIDCProviderService) AuthenticateUser(tenantID uint, username, password string) (*sso.User, error) {
 	var user sso.User
-	db := migrations.GetDB().Where("username = ? AND status = 1", username)
+	db := global.GetDB().Where("username = ? AND status = 1", username)
 	if tenantID > 0 {
 		db = db.Where("tenant_id = ?", tenantID)
 	}
@@ -593,7 +593,7 @@ func (s *OIDCProviderService) AuthenticateUser(tenantID uint, username, password
 
 	// 更新最后登录时间
 	now := time.Now()
-	migrations.GetDB().Model(&user).Update("last_login_at", now)
+	global.GetDB().Model(&user).Update("last_login_at", now)
 
 	return &user, nil
 }

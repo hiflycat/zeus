@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"backend/internal/config"
+	"backend/internal/global"
 	"backend/internal/model/sso"
-	"backend/migrations"
 	"backend/pkg/utils"
 
 	"gorm.io/gorm"
@@ -22,7 +22,7 @@ import (
 // GetUserByID 根据 ID 获取用户
 func GetUserByID(userID uint) (*sso.User, error) {
 	var user sso.User
-	if err := migrations.GetDB().First(&user, userID).Error; err != nil {
+	if err := global.GetDB().First(&user, userID).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -31,7 +31,7 @@ func GetUserByID(userID uint) (*sso.User, error) {
 // GetUserWithGroups 根据 ID 获取用户（包含用户组）
 func GetUserWithGroups(userID uint) (*sso.User, error) {
 	var user sso.User
-	if err := migrations.GetDB().Preload("Groups").First(&user, userID).Error; err != nil {
+	if err := global.GetDB().Preload("Groups").First(&user, userID).Error; err != nil {
 		return nil, err
 	}
 	return &user, nil
@@ -124,7 +124,7 @@ func computeHMAC(data []byte) []byte {
 // AuthenticateUser 验证用户登录
 func AuthenticateUser(tenantID uint, username, password string) (*sso.User, error) {
 	var user sso.User
-	db := migrations.GetDB().Where("username = ? AND status = 1", username)
+	db := global.GetDB().Where("username = ? AND status = 1", username)
 	if tenantID > 0 {
 		db = db.Where("tenant_id = ?", tenantID)
 	}
@@ -141,7 +141,7 @@ func AuthenticateUser(tenantID uint, username, password string) (*sso.User, erro
 
 	// 更新最后登录时间
 	now := time.Now()
-	migrations.GetDB().Model(&user).Update("last_login_at", now)
+	global.GetDB().Model(&user).Update("last_login_at", now)
 
 	return &user, nil
 }
@@ -184,7 +184,7 @@ func GetGroupNames(groups []*sso.Group) []string {
 // GetTenantByName 根据名称获取租户
 func GetTenantByName(name string) (*sso.Tenant, error) {
 	var tenant sso.Tenant
-	if err := migrations.GetDB().Where("LOWER(name) = LOWER(?)", name).First(&tenant).Error; err != nil {
+	if err := global.GetDB().Where("LOWER(name) = LOWER(?)", name).First(&tenant).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("租户不存在")
 		}
@@ -196,7 +196,7 @@ func GetTenantByName(name string) (*sso.Tenant, error) {
 // GetClientByID 根据 client_id 获取客户端
 func GetClientByID(clientID string) (*sso.OIDCClient, error) {
 	var client sso.OIDCClient
-	if err := migrations.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
+	if err := global.GetDB().Where("client_id = ? AND status = 1", clientID).First(&client).Error; err != nil {
 		return nil, err
 	}
 	return &client, nil
@@ -209,7 +209,7 @@ func GetClientByRootURL(serviceURL string) (*sso.OIDCClient, error) {
 		return nil, err
 	}
 	var client sso.OIDCClient
-	if err := migrations.GetDB().Where("status = 1 AND root_url LIKE ?", parsed.Scheme+"://"+parsed.Host+"%").First(&client).Error; err != nil {
+	if err := global.GetDB().Where("status = 1 AND root_url LIKE ?", parsed.Scheme+"://"+parsed.Host+"%").First(&client).Error; err != nil {
 		return nil, err
 	}
 	return &client, nil

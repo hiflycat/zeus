@@ -1,10 +1,12 @@
 package handler
 
 import (
-	"github.com/gin-gonic/gin"
+	"backend/internal/model/request"
 	"backend/internal/service"
 	"backend/pkg/email"
-	"backend/pkg/response"
+	"backend/internal/model/response"
+
+	"github.com/gin-gonic/gin"
 )
 
 // SystemConfigHandler 系统配置处理器
@@ -81,9 +83,7 @@ func (h *SystemConfigHandler) UpdateEmailConfig(c *gin.Context) {
 
 // TestEmail 测试邮箱配置
 func (h *SystemConfigHandler) TestEmail(c *gin.Context) {
-	var req struct {
-		To string `json:"to" binding:"required"` // 测试收件人邮箱
-	}
+	var req request.TestEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
 		return
@@ -141,9 +141,7 @@ func (h *SystemConfigHandler) GetStorageConfig(c *gin.Context) {
 
 // UpdateStorageConfig 更新存储配置
 func (h *SystemConfigHandler) UpdateStorageConfig(c *gin.Context) {
-	var req struct {
-		Value string `json:"value"`
-	}
+	var req request.UpdateStorageConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return
@@ -174,10 +172,7 @@ func (h *SystemConfigHandler) GetNotifyConfig(c *gin.Context) {
 
 // UpdateNotifyConfig 更新通知配置
 func (h *SystemConfigHandler) UpdateNotifyConfig(c *gin.Context) {
-	var req struct {
-		DingTalk string `json:"dingtalk"`
-		WeChat   string `json:"wechat"`
-	}
+	var req request.UpdateNotifyConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
 		return

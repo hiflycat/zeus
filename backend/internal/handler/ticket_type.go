@@ -4,8 +4,9 @@ import (
 	"strconv"
 
 	"backend/internal/model"
+	"backend/internal/model/request"
 	"backend/internal/service"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -65,15 +66,17 @@ func (h *TicketTypeHandler) GetByID(c *gin.Context) {
 }
 
 func (h *TicketTypeHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	keyword := c.Query("keyword")
-	types, total, err := h.svc.List(page, pageSize, keyword)
+	var req request.ListTicketTypeRequest
+	if err := c.ShouldBindQuery(&req); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+	types, total, err := h.svc.List(req.GetPage(), req.GetPageSize(), req.Keyword)
 	if err != nil {
 		response.InternalError(c, err.Error())
 		return
 	}
-	response.Success(c, gin.H{"list": types, "total": total, "page": page, "page_size": pageSize})
+	response.Success(c, response.NewPageResponse(types, total, req.GetPage(), req.GetPageSize()))
 }
 
 func (h *TicketTypeHandler) ListEnabled(c *gin.Context) {

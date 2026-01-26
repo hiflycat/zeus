@@ -4,9 +4,9 @@ import (
 	"strconv"
 
 	casbinPkg "backend/internal/casbin"
+	"backend/internal/global"
 	"backend/internal/model"
-	"backend/migrations"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,7 +26,7 @@ func CasbinRBACMiddleware() gin.HandlerFunc {
 
 		// 获取用户的角色
 		var user model.User
-		if err := migrations.GetDB().Preload("Roles").Where("id = ?", userID).First(&user).Error; err != nil {
+		if err := global.GetDB().Preload("Roles").Where("id = ?", userID).First(&user).Error; err != nil {
 			response.Forbidden(c, "权限不足")
 			c.Abort()
 			return

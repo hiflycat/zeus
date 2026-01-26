@@ -5,7 +5,7 @@ import (
 
 	"backend/internal/service/sso"
 	"backend/pkg/jwt"
-	"backend/pkg/response"
+	"backend/internal/model/response"
 
 	"github.com/gin-gonic/gin"
 )

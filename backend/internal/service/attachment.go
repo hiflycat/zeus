@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 	"backend/pkg/storage"
 )
 
@@ -67,7 +67,7 @@ func (s *AttachmentService) Upload(ctx context.Context, ticketID uint, commentID
 		StoragePath: storagePath,
 		UploaderID:  uploaderID,
 	}
-	if err := migrations.GetDB().Create(attachment).Error; err != nil {
+	if err := global.GetDB().Create(attachment).Error; err != nil {
 		provider.Delete(ctx, storagePath)
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (s *AttachmentService) Upload(ctx context.Context, ticketID uint, commentID
 // Delete 删除附件
 func (s *AttachmentService) Delete(ctx context.Context, id uint) error {
 	var attachment model.TicketAttachment
-	if err := migrations.GetDB().First(&attachment, id).Error; err != nil {
+	if err := global.GetDB().First(&attachment, id).Error; err != nil {
 		return err
 	}
 
@@ -86,13 +86,13 @@ func (s *AttachmentService) Delete(ctx context.Context, id uint) error {
 		provider.Delete(ctx, attachment.StoragePath)
 	}
 
-	return migrations.GetDB().Delete(&attachment).Error
+	return global.GetDB().Delete(&attachment).Error
 }
 
 // GetByID 根据ID获取附件
 func (s *AttachmentService) GetByID(id uint) (*model.TicketAttachment, error) {
 	var attachment model.TicketAttachment
-	if err := migrations.GetDB().First(&attachment, id).Error; err != nil {
+	if err := global.GetDB().First(&attachment, id).Error; err != nil {
 		return nil, err
 	}
 	return &attachment, nil
@@ -101,7 +101,7 @@ func (s *AttachmentService) GetByID(id uint) (*model.TicketAttachment, error) {
 // GetByTicketID 获取工单的所有附件
 func (s *AttachmentService) GetByTicketID(ticketID uint) ([]model.TicketAttachment, error) {
 	var attachments []model.TicketAttachment
-	if err := migrations.GetDB().Where("ticket_id = ?", ticketID).Find(&attachments).Error; err != nil {
+	if err := global.GetDB().Where("ticket_id = ?", ticketID).Find(&attachments).Error; err != nil {
 		return nil, err
 	}
 	return attachments, nil

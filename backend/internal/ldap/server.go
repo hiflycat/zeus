@@ -6,8 +6,8 @@ import (
 	"net"
 	"strings"
 
+	"backend/internal/global"
 	"backend/internal/model/sso"
-	"backend/migrations"
 	"backend/pkg/utils"
 
 	ldap "github.com/nmcclain/ldap"
@@ -98,14 +98,14 @@ func (h *Handler) Bind(bindDN, bindSimplePw string, conn net.Conn) (ldap.LDAPRes
 
 	// 查找租户（忽略大小写）
 	var tenant sso.Tenant
-	if err := migrations.GetDB().Where("LOWER(name) = LOWER(?) AND status = 1", tenantName).First(&tenant).Error; err != nil {
+	if err := global.GetDB().Where("LOWER(name) = LOWER(?) AND status = 1", tenantName).First(&tenant).Error; err != nil {
 		log.Printf("LDAP Bind failed: tenant not found: %s", tenantName)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
 
 	// 查找用户
 	var user sso.User
-	if err := migrations.GetDB().Where("tenant_id = ? AND username = ? AND status = 1", tenant.ID, username).First(&user).Error; err != nil {
+	if err := global.GetDB().Where("tenant_id = ? AND username = ? AND status = 1", tenant.ID, username).First(&user).Error; err != nil {
 		log.Printf("LDAP Bind failed: user not found: %s", username)
 		return ldap.LDAPResultInvalidCredentials, nil
 	}
@@ -138,7 +138,7 @@ func (h *Handler) Search(boundDN string, req ldap.SearchRequest, conn net.Conn) 
 
 	// 查找租户（忽略大小写）
 	var tenant sso.Tenant
-	if err := migrations.GetDB().Where("LOWER(name) = LOWER(?) AND status = 1", tenantName).First(&tenant).Error; err != nil {
+	if err := global.GetDB().Where("LOWER(name) = LOWER(?) AND status = 1", tenantName).First(&tenant).Error; err != nil {
 		return ldap.ServerSearchResult{ResultCode: ldap.LDAPResultNoSuchObject}, nil
 	}
 
@@ -146,7 +146,7 @@ func (h *Handler) Search(boundDN string, req ldap.SearchRequest, conn net.Conn) 
 	filterType, filterValue := h.parseFilter(req.Filter)
 
 	var users []sso.User
-	db := migrations.GetDB().Preload("Groups").Where("tenant_id = ? AND status = 1", tenant.ID)
+	db := global.GetDB().Preload("Groups").Where("tenant_id = ? AND status = 1", tenant.ID)
 
 	switch filterType {
 	case "all":

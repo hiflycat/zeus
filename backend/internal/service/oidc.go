@@ -10,7 +10,7 @@ import (
 
 	"backend/internal/config"
 	"backend/internal/model"
-	"backend/migrations"
+	"backend/internal/global"
 	"backend/pkg/jwt"
 	"backend/pkg/utils"
 
@@ -165,13 +165,13 @@ func (s *OIDCService) LoginOrCreateUser(claims map[string]interface{}) (string, 
 
 	// 尝试通过 email 查找用户
 	if email != "" {
-		if err := migrations.GetDB().Where("email = ?", email).First(&user).Error; err == nil {
+		if err := global.GetDB().Where("email = ?", email).First(&user).Error; err == nil {
 			// 用户已存在，只更新信息，不更新角色
 			user.Username = username
 			if name != "" {
 				// 可以在这里更新其他字段
 			}
-			migrations.GetDB().Save(&user)
+			global.GetDB().Save(&user)
 		}
 	}
 
@@ -200,7 +200,7 @@ func (s *OIDCService) LoginOrCreateUser(claims map[string]interface{}) (string, 
 		}
 		user.Password = hashedPassword
 
-		if err := migrations.GetDB().Create(&user).Error; err != nil {
+		if err := global.GetDB().Create(&user).Error; err != nil {
 			return "", nil, fmt.Errorf("failed to create user: %w", err)
 		}
 
@@ -208,7 +208,7 @@ func (s *OIDCService) LoginOrCreateUser(claims map[string]interface{}) (string, 
 		if len(oidcConfig.DefaultRoles) > 0 {
 			var roles []model.Role
 			// 查找已存在的角色（配置中的角色应该已经存在）
-			if err := migrations.GetDB().Where("id IN ?", oidcConfig.DefaultRoles).Find(&roles).Error; err != nil {
+			if err := global.GetDB().Where("id IN ?", oidcConfig.DefaultRoles).Find(&roles).Error; err != nil {
 				return "", nil, fmt.Errorf("failed to find roles: %w", err)
 			}
 
@@ -219,7 +219,7 @@ func (s *OIDCService) LoginOrCreateUser(claims map[string]interface{}) (string, 
 
 			// 分配角色给新用户
 			if len(roles) > 0 {
-				if err := migrations.GetDB().Model(&user).Association("Roles").Append(roles); err != nil {
+				if err := global.GetDB().Model(&user).Association("Roles").Append(roles); err != nil {
 					return "", nil, fmt.Errorf("failed to assign roles to user: %w", err)
 				}
 			}
